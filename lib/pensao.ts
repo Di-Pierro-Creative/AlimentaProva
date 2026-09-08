@@ -4,6 +4,7 @@
 // advogado.
 
 import type { Combinado, DespesaAtual, PagamentoAtual } from "./types";
+import { salarioMinimoEm } from "./salario-minimo";
 
 export interface MesPensao {
   /** YYYY-MM */
@@ -73,14 +74,46 @@ export function diasAposVencimento(p: { data_do_fato: string; referencia: string
  * `vigente_desde`) só vale dali em diante. Se o combinado foi retirado, nada
  * é devido em mês nenhum.
  */
-export function devidoNoMes(logCombinado: Combinado[], mes: string): { valor: number; dia: number } | null {
+export interface Devido {
+  valor: number;
+  dia: number;
+  /** presente quando a pensão é em % do salário mínimo: qual mínimo e qual % geraram o valor */
+  sm?: { salario_centavos: number; percentual: number; norma: string };
+}
+
+export function devidoNoMes(logCombinado: Combinado[], mes: string): Devido | null {
   if (!combinadoAtual(logCombinado)) return null;
   let melhor: Combinado | null = null;
   for (const c of logCombinado) {
     if (c.retirada || c.vigente_desde > mes) continue;
     if (!melhor || c.versao > melhor.versao) melhor = c;
   }
-  return melhor ? { valor: melhor.valor_centavos, dia: melhor.dia_vencimento } : null;
+  if (!melhor) return null;
+  return valorDoCombinado(melhor, mes);
+}
+
+/** O valor que um combinado gera num mês: fixo em reais, ou % do salário mínimo daquele mês. */
+export function valorDoCombinado(c: Combinado, mes: string): Devido {
+  if (c.modo === "sm" && c.percentual_sm) {
+    const sm = salarioMinimoEm(mes);
+    if (sm) {
+      return {
+        valor: Math.round((sm.valor_centavos * c.percentual_sm) / 100),
+        dia: c.dia_vencimento,
+        sm: { salario_centavos: sm.valor_centavos, percentual: c.percentual_sm, norma: sm.norma },
+      };
+    }
+  }
+  return { valor: c.valor_centavos, dia: c.dia_vencimento };
+}
+
+/** "30% do salário mínimo" ou "R$ 1.500,00" — como descrever o combinado. */
+export function descreverCombinado(c: Combinado, brl: (v: number) => string): string {
+  if (c.modo === "sm" && c.percentual_sm) {
+    const p = Number.isInteger(c.percentual_sm) ? String(c.percentual_sm) : c.percentual_sm.toFixed(2).replace(".", ",");
+    return `${p}% do salário mínimo`;
+  }
+  return brl(c.valor_centavos);
 }
 
 /** Primeiro mês com algo registrado (pagamento ou combinado), ou null. */

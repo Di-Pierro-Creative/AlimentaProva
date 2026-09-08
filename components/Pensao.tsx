@@ -10,8 +10,11 @@ import CabecalhoCofre from "./CabecalhoCofre";
 import GraficoCustoPensao from "./GraficoCustoPensao";
 import { listarAtuais, obterBlob } from "@/lib/store";
 import { listarLogCombinado, listarPagamentosAtuais, nomeForma } from "@/lib/pagamentos";
-import { combinadoAtual, descreverMes, diasAposVencimento, mesesPensao, serieCustoPensao } from "@/lib/pensao";
-import { formatBRL, formatData, nomeMes } from "@/lib/format";
+import { combinadoAtual, descreverCombinado, descreverMes, diasAposVencimento, mesAtual, mesesPensao, serieCustoPensao, valorDoCombinado } from "@/lib/pensao";
+import { calcularAtrasados, PARAMETROS_PADRAO } from "@/lib/atrasados";
+import { INDICES_EMBUTIDOS, type Indices } from "@/lib/indices";
+import { obterIndices } from "@/lib/indices-cache";
+import { formatBRL, formatData, hojeISO, nomeMes } from "@/lib/format";
 import type { Combinado, DespesaAtual, PagamentoAtual } from "@/lib/types";
 
 export default function Pensao() {
@@ -24,6 +27,7 @@ export default function Pensao() {
   const [erro, setErro] = useState<string | null>(null);
   const [mostrarAviso, setMostrarAviso] = useState(salvo);
   const [mostrarRetirados, setMostrarRetirados] = useState(false);
+  const [indices, setIndices] = useState<Indices>(INDICES_EMBUTIDOS);
 
   useEffect(() => {
     const carregar = () =>
@@ -35,6 +39,7 @@ export default function Pensao() {
         })
         .catch(() => setErro("Não consegui abrir o cofre neste navegador. Tente fora do modo anônimo."));
     carregar();
+    obterIndices().then(setIndices);
     window.addEventListener("cofre:sincronizou", carregar);
     return () => window.removeEventListener("cofre:sincronizou", carregar);
   }, []);
@@ -50,6 +55,10 @@ export default function Pensao() {
   const retirados = useMemo(() => (pagamentos ?? []).filter((p) => p.retirada), [pagamentos]);
   const meses = useMemo(() => mesesPensao(pagamentos ?? [], logCombinado), [pagamentos, logCombinado]);
   const serie = useMemo(() => serieCustoPensao(despesas, pagamentos ?? [], logCombinado, 12), [despesas, pagamentos, logCombinado]);
+  const atrasados = useMemo(
+    () => (combinado ? calcularAtrasados(meses, indices, { ...PARAMETROS_PADRAO, dataCalculo: hojeISO() }) : null),
+    [combinado, meses, indices],
+  );
 
   const ano = String(new Date().getFullYear());
   const recebidoAno = ativos.filter((p) => p.referencia.startsWith(ano)).reduce((s, p) => s + p.valor_centavos, 0);
@@ -93,9 +102,10 @@ export default function Pensao() {
                 <div>
                   <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">Valor combinado</div>
                   <div className="tnum mt-0.5 text-base font-semibold">
-                    {formatBRL(combinado.valor_centavos)}
+                    {formatBRL(valorDoCombinado(combinado, mesAtual()).valor)}
                     <span className="ml-2 text-xs font-medium text-ink-2">
-                      vence dia {combinado.dia_vencimento} · desde {nomeMes(combinado.vigente_desde).toLowerCase()}
+                      {combinado.modo === "sm" ? `${descreverCombinado(combinado, formatBRL)} · ` : ""}vence dia {combinado.dia_vencimento} · desde{" "}
+                      {nomeMes(combinado.vigente_desde).toLowerCase()}
                     </span>
                   </div>
                 </div>
@@ -112,6 +122,19 @@ export default function Pensao() {
               <Tile rotulo={`Recebido em ${ano}`} valor={formatBRL(recebidoAno)} />
               <Tile rotulo="Com comprovante" valor={`${comComprovante} de ${ativos.length}`} />
             </div>
+
+            {atrasados && atrasados.parcelas.length > 0 && (
+              <Link href="/pensao/atrasados" className="mb-3 flex items-center justify-between rounded-2xl border border-risk/30 bg-risk-soft px-4 py-3 active:bg-risk-soft/70">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-risk">Em aberto · {atrasados.parcelas.length} {atrasados.parcelas.length === 1 ? "mês" : "meses"}</div>
+                  <div className="tnum mt-0.5 text-base font-semibold text-ink">
+                    {formatBRL(atrasados.total)}
+                    <span className="ml-2 text-xs font-medium text-ink-2">atualizado ({formatBRL(atrasados.totalAberto)} original)</span>
+                  </div>
+                </div>
+                <span className="text-sm font-medium text-risk">memória de cálculo ›</span>
+              </Link>
+            )}
 
             {serie.length > 0 && (
               <section className="mb-5 rounded-2xl border border-rule bg-surface px-4 py-3">

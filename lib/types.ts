@@ -141,6 +141,15 @@ export type PagamentoAtual = Pagamento & { historico: number };
  * `vigente_desde`. Assim o app sabe o que era devido em cada mês.
  */
 export interface Combinado extends Registro {
+  /**
+   * Como o valor foi fixado. "reais" (padrão): `valor_centavos` fixo.
+   * "sm": `percentual_sm` do salário mínimo vigente em cada mês — o app calcula
+   * o valor do mês pela tabela oficial; `valor_centavos` guarda o valor no mês
+   * em que foi registrado, só para referência.
+   */
+  modo?: "reais" | "sm";
+  /** percentual do salário mínimo (ex.: 30 = 30%; 150 = um salário e meio) */
+  percentual_sm?: number;
   valor_centavos: number;
   /** dia do mês em que vence (1–31) */
   dia_vencimento: number;

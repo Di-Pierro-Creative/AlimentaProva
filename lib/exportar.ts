@@ -15,7 +15,9 @@ import { formatPercentual } from "./rateio";
 import { montarZip, type EntradaZip } from "./zip";
 import { obterBlob } from "./store";
 import { nomeForma } from "./pagamentos";
-import { combinadoAtual, devidoNoMes, diasAposVencimento, mesAtual, mesesEntre } from "./pensao";
+import { combinadoAtual, devidoNoMes, diasAposVencimento, mesAtual, mesesEntre, mesesPensao } from "./pensao";
+import { calcularAtrasados, descreverParametros, PARAMETROS_PADRAO, type Atrasados } from "./atrasados";
+import { INDICES_EMBUTIDOS, type Indices } from "./indices";
 
 /** Período inclusivo em meses: "2026-07" a "2026-09". null = tudo. */
 export interface Periodo {
@@ -361,6 +363,47 @@ export function gerarCSVMensal(linhas: LinhaMensal[]): string {
   return BOM + [cab.join(";"), ...corpo, rodape].join(FIM) + FIM;
 }
 
+export function gerarCSVAtrasados(a: Atrasados): string {
+  const cab = ["mes", "vencimento", "combinado", "recebido", "em_aberto", "fator_correcao", "corrigido", "dias_de_atraso", "juros", "total_atualizado", "janela_art_528_7", "meses_sem_indice"];
+  const janela = new Set(a.tresMaisRecentes.meses);
+  const linhas = a.parcelas.map((x) =>
+    [
+      mesBR(x.mes),
+      dataBR(x.vencimento),
+      centavosCSV(x.devido),
+      centavosCSV(x.recebido),
+      centavosCSV(x.aberto),
+      x.fator.toFixed(6).replace(".", ","),
+      centavosCSV(x.corrigido),
+      String(x.dias),
+      centavosCSV(x.juros),
+      centavosCSV(x.total),
+      janela.has(x.mes) ? "sim" : "",
+      x.semIndice.join(" "),
+    ]
+      .map(csvCampo)
+      .join(";"),
+  );
+  const rodape = ["TOTAL", "", "", "", centavosCSV(a.totalAberto), "", centavosCSV(a.totalCorrigido), "", centavosCSV(a.totalJuros), centavosCSV(a.total)].map(csvCampo).join(";");
+  const nota = [
+    `CRITERIO;${descreverParametros(a.parametros)}; data do calculo ${dataBR(a.parametros.dataCalculo)}${a.indiceAte ? `; indice disponivel ate ${mesBR(a.indiceAte)}` : ""}`,
+    `NOTA;Conta aritmetica sobre o que foi registrado. Indice, juros e data-base sao definidos pela sentenca ou pelo juizo. A coluna janela_art_528_7 marca as 3 prestacoes vencidas mais recentes.`,
+  ];
+  return BOM + [cab.join(";"), ...linhas, rodape, ...nota].join(FIM) + FIM;
+}
+
+/** Atrasados do período com os parâmetros padrão (INPC, 1% a.m.), para a pasta e o relatório. */
+export function atrasadosDaPasta(prep: Preparado, periodo: Periodo | null, indices: Indices = INDICES_EMBUTIDOS, dataCalculo = new Date().toISOString().slice(0, 10)): Atrasados | null {
+  if (!combinadoAtual(prep.combinado)) return null;
+  const meses = mesesPensao(
+    prep.pagamentos.map((p) => ({ ...p, historico: 1 })),
+    prep.combinado,
+    dataCalculo.slice(0, 7),
+  ).filter((m) => mesNoPeriodo(m.mes, periodo));
+  const a = calcularAtrasados(meses, indices, { ...PARAMETROS_PADRAO, dataCalculo });
+  return a.parcelas.length ? a : null;
+}
+
 // ---------- índice ----------
 
 export function gerarIndice(
@@ -371,6 +414,7 @@ export function gerarIndice(
   periodo: Periodo | null,
   pagamentos: Pagamento[] = [],
   pagamentosRetirados: Pagamento[] = [],
+  atrasados: Atrasados | null = null,
 ): string {
   const agora = new Date();
   const comComprovante = ativas.filter((d) => d.comprovante).length;
@@ -387,11 +431,13 @@ export function gerarIndice(
     l.push(`Pagamentos de pensão: ${pagamentos.length} (${pagamentos.filter((p) => p.comprovante).length} com comprovante) — total recebido: R$ ${centavosCSV(totalPensao)}`);
     if (pagamentosRetirados.length) l.push(`Pagamentos retirados do cofre (não contam, em pagamentos_retirados.csv): ${pagamentosRetirados.length}`);
   }
+  if (atrasados) l.push(`Em aberto (combinado − recebido): R$ ${centavosCSV(atrasados.totalAberto)} em ${atrasados.parcelas.length} meses — atualizado: R$ ${centavosCSV(atrasados.total)} (${descreverParametros(atrasados.parametros)})`);
   l.push("");
   l.push("O QUE TEM AQUI");
   l.push("planilha.csv        uma linha por despesa; abre no Excel ou Google Sheets (separador ;)");
   if (pagamentos.length) l.push("pagamentos.csv      uma linha por pagamento de pensão recebido, com o mês a que se refere");
   l.push("custo_x_pensao.csv  mês a mês: custo do filho, pensão combinada, pensão recebida e a diferença");
+  if (atrasados) l.push("atrasados.csv       memória de cálculo do que ficou em aberto: correção, juros, total por parcela e critério usado");
   l.push("comprovantes/       os arquivos originais, renomeados: data_categoria_valor_selo.ext");
   l.push("                    (um print com várias despesas aparece uma vez, como data_lote-N-despesas_selo.ext;");
   l.push("                     comprovante de pensão: data_pensao-MES_valor_selo.ext)");
@@ -404,7 +450,8 @@ export function gerarIndice(
   l.push("registrado_no_cofre_em quando a despesa entrou no cofre (distinto da data da despesa).");
   l.push("versoes                quantas versões o registro tem; edições nunca apagam a anterior.");
   l.push("pensao_de              o mês da pensão a que o pagamento se refere (pode diferir do mês em que entrou).");
-  l.push("combinado_no_mes       o valor combinado/fixado que valia naquele mês, conforme registrado pela parte.");
+  l.push("combinado_no_mes       o valor combinado/fixado que valia naquele mês, conforme registrado pela parte");
+  l.push("                       (se fixado em % do salário mínimo, calculado com o mínimo vigente no mês).");
   l.push("selo                   SHA-256 dos bytes do arquivo, calculado no aparelho no momento do registro.");
   l.push("                       Recalcular o SHA-256 do arquivo desta pasta deve dar o mesmo valor:");
   l.push("");
@@ -428,30 +475,33 @@ export function nomePasta(periodo: Periodo | null): string {
 }
 
 /** Tudo que entra na pasta, já filtrado pelo período e com os nomes de arquivo decididos. */
-export function conteudoDaPasta(prep: Preparado, periodo: Periodo | null) {
+export function conteudoDaPasta(prep: Preparado, periodo: Periodo | null, indices: Indices = INDICES_EMBUTIDOS) {
   const ativas = prep.ativas.filter((d) => noPeriodo(d, periodo));
   const retiradas = prep.retiradas.filter((d) => noPeriodo(d, periodo));
   const pagamentos = prep.pagamentos.filter((p) => pagamentoNoPeriodo(p, periodo));
   const pagamentosRetirados = prep.pagamentosRetirados.filter((p) => pagamentoNoPeriodo(p, periodo));
   const nomes = nomesDosComprovantes(ativas, pagamentos);
+  const atrasados = atrasadosDaPasta(prep, periodo, indices);
   const arquivos: Array<{ nome: string; texto: string; mime: string }> = [
-    { nome: "LEIA-ME.txt", texto: gerarIndice(ativas, retiradas, prep, nomes, periodo, pagamentos, pagamentosRetirados), mime: "text/plain; charset=utf-8" },
+    { nome: "LEIA-ME.txt", texto: gerarIndice(ativas, retiradas, prep, nomes, periodo, pagamentos, pagamentosRetirados, atrasados), mime: "text/plain; charset=utf-8" },
     { nome: "planilha.csv", texto: gerarCSV(ativas, prep, nomes), mime: "text/csv; charset=utf-8" },
     { nome: "custo_x_pensao.csv", texto: gerarCSVMensal(resumoMensal(ativas, pagamentos, prep.combinado, periodo)), mime: "text/csv; charset=utf-8" },
   ];
   if (pagamentos.length) arquivos.push({ nome: "pagamentos.csv", texto: gerarCSVPagamentos(pagamentos, prep, nomes), mime: "text/csv; charset=utf-8" });
+  if (atrasados) arquivos.push({ nome: "atrasados.csv", texto: gerarCSVAtrasados(atrasados), mime: "text/csv; charset=utf-8" });
   if (retiradas.length) arquivos.push({ nome: "retiradas.csv", texto: gerarCSVRetiradas(retiradas, prep), mime: "text/csv; charset=utf-8" });
   if (pagamentosRetirados.length)
     arquivos.push({ nome: "pagamentos_retirados.csv", texto: gerarCSVPagamentosRetirados(pagamentosRetirados, prep), mime: "text/csv; charset=utf-8" });
-  return { ativas, retiradas, pagamentos, pagamentosRetirados, nomes, arquivos };
+  return { ativas, retiradas, pagamentos, pagamentosRetirados, nomes, arquivos, atrasados };
 }
 
 export async function montarPasta(
   prep: Preparado,
   periodo: Periodo | null,
   aoProgredir?: (feitos: number, total: number) => void,
+  indices: Indices = INDICES_EMBUTIDOS,
 ): Promise<{ blob: Blob; nome: string }> {
-  const { nomes, arquivos } = conteudoDaPasta(prep, periodo);
+  const { nomes, arquivos } = conteudoDaPasta(prep, periodo, indices);
   const pasta = nomePasta(periodo);
   const enc = new TextEncoder();
   const entradas: EntradaZip[] = arquivos.map((a) => ({ nome: `${pasta}/${a.nome}`, dados: enc.encode(a.texto) }));

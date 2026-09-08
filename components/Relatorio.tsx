@@ -11,7 +11,10 @@ import { listarLogCombinado, listarLogPagamentos, nomeForma } from "@/lib/pagame
 import { CATEGORIAS, categoria as infoCategoria } from "@/lib/categorias";
 import { formatBRL, formatData, formatDataHora, formatDataLonga, nomeMes } from "@/lib/format";
 import { descreverRateio } from "@/lib/rateio";
-import { noPeriodo, pagamentoNoPeriodo, preparar, resumoMensal, type Periodo, type Preparado } from "@/lib/exportar";
+import { atrasadosDaPasta, noPeriodo, pagamentoNoPeriodo, preparar, resumoMensal, type Periodo, type Preparado } from "@/lib/exportar";
+import { descreverParametros } from "@/lib/atrasados";
+import { obterIndices } from "@/lib/indices-cache";
+import { INDICES_EMBUTIDOS, type Indices } from "@/lib/indices";
 import { devidoNoMes, diasAposVencimento } from "@/lib/pensao";
 import GraficoCustoPensao from "./GraficoCustoPensao";
 import type { Despesa } from "@/lib/types";
@@ -25,11 +28,13 @@ export default function Relatorio() {
   const [prep, setPrep] = useState<Preparado | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [geradoEm] = useState(() => new Date().toISOString());
+  const [indices, setIndices] = useState<Indices>(INDICES_EMBUTIDOS);
 
   useEffect(() => {
     Promise.all([listarLog(), listarLogPagamentos(), listarLogCombinado()])
       .then(([log, logPag, logComb]) => setPrep(preparar(log, logPag, logComb)))
       .catch(() => setErro("Não consegui abrir o cofre neste navegador."));
+    obterIndices().then(setIndices);
   }, []);
 
   const ativas = useMemo(() => (prep ? prep.ativas.filter((d) => noPeriodo(d, periodo)) : []), [prep, periodo]);
@@ -42,6 +47,7 @@ export default function Relatorio() {
   const temPensao = pagamentos.length > 0 || mensal.some((l) => l.combinado !== null);
   const serie = useMemo(() => mensal.map((l) => ({ mes: l.mes, custo: l.custo, recebido: l.recebido, devido: l.combinado })), [mensal]);
   const nadaNoPeriodo = ativas.length === 0 && pagamentos.length === 0;
+  const atrasados = useMemo(() => (prep ? atrasadosDaPasta(prep, periodo, indices) : null), [prep, periodo, indices]);
 
   const porCategoria = useMemo(() => {
     const m = new Map<string, { n: number; total: number }>();
@@ -286,6 +292,69 @@ export default function Relatorio() {
                         </tbody>
                       </table>
                     </div>
+                  </section>
+                )}
+
+                {atrasados && (
+                  <section className="mt-7 break-inside-avoid">
+                    <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-ink-3">Em aberto, atualizado — memória de cálculo</h2>
+                    <p className="mb-2 text-[11px] text-ink-2">
+                      {descreverParametros(atrasados.parametros)}; data do cálculo {formatData(atrasados.parametros.dataCalculo)}
+                      {atrasados.indiceAte ? `; ${atrasados.parametros.indice} disponível até ${nomeMes(atrasados.indiceAte).toLowerCase()}` : ""}.
+                      {atrasados.mesesSemIndice.length > 0 && ` Sem índice para ${atrasados.mesesSemIndice.map((m) => nomeMes(m).toLowerCase()).join(", ")} (entrou como zero).`}
+                    </p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[640px] border-collapse">
+                        <thead>
+                          <tr className="border-b border-rule text-left text-[11px] uppercase tracking-wide text-ink-3">
+                            <th className="py-1.5 pr-2 font-semibold">Mês</th>
+                            <th className="py-1.5 pr-2 font-semibold">Vencimento</th>
+                            <th className="py-1.5 pr-2 text-right font-semibold">Combinado</th>
+                            <th className="py-1.5 pr-2 text-right font-semibold">Recebido</th>
+                            <th className="py-1.5 pr-2 text-right font-semibold">Em aberto</th>
+                            <th className="py-1.5 pr-2 text-right font-semibold">Fator</th>
+                            <th className="py-1.5 pr-2 text-right font-semibold">Corrigido</th>
+                            <th className="py-1.5 pr-2 text-right font-semibold">Juros</th>
+                            <th className="py-1.5 text-right font-semibold">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {atrasados.parcelas.map((x) => (
+                            <tr key={x.mes} className="border-b border-rule/70">
+                              <td className="whitespace-nowrap py-1.5 pr-2">
+                                {nomeMes(x.mes)}
+                                {atrasados.tresMaisRecentes.meses.includes(x.mes) && <span className="ml-1 text-[10px] text-ink-3">§ 7º</span>}
+                              </td>
+                              <td className="tnum whitespace-nowrap py-1.5 pr-2">{formatData(x.vencimento)}</td>
+                              <td className="tnum py-1.5 pr-2 text-right">{formatBRL(x.devido)}</td>
+                              <td className="tnum py-1.5 pr-2 text-right">{formatBRL(x.recebido)}</td>
+                              <td className="tnum py-1.5 pr-2 text-right">{formatBRL(x.aberto)}</td>
+                              <td className="tnum py-1.5 pr-2 text-right">{x.fator.toFixed(6).replace(".", ",")}</td>
+                              <td className="tnum py-1.5 pr-2 text-right">{formatBRL(x.corrigido)}</td>
+                              <td className="tnum py-1.5 pr-2 text-right">{formatBRL(x.juros)}</td>
+                              <td className="tnum py-1.5 text-right font-medium">{formatBRL(x.total)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t-2 border-ink font-semibold">
+                            <td className="py-2 pr-2" colSpan={4}>
+                              Total
+                            </td>
+                            <td className="tnum py-2 pr-2 text-right">{formatBRL(atrasados.totalAberto)}</td>
+                            <td />
+                            <td className="tnum py-2 pr-2 text-right">{formatBRL(atrasados.totalCorrigido)}</td>
+                            <td className="tnum py-2 pr-2 text-right">{formatBRL(atrasados.totalJuros)}</td>
+                            <td className="tnum py-2 text-right">{formatBRL(atrasados.total)}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                    <p className="mt-2 text-[11px] text-ink-2">
+                      “§ 7º” marca as 3 prestações vencidas mais recentes (art. 528, § 7º, CPC): em aberto nelas, {formatBRL(atrasados.tresMaisRecentes.total)}; nas
+                      anteriores, {formatBRL(atrasados.anteriores.total)}. Conta aritmética sobre o registrado, com o critério acima; índice, juros e data-base são
+                      definidos pela sentença ou pelo juízo.
+                    </p>
                   </section>
                 )}
 

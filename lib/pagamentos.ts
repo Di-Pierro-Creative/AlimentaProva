@@ -167,6 +167,10 @@ export async function gravarPagamentoVindoDaNuvem(p: Pagamento): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export interface CombinadoInput {
+  /** "reais" (padrão) ou "sm" (% do salário mínimo) */
+  modo?: "reais" | "sm";
+  percentual_sm?: number;
+  /** em "sm", o valor no mês do registro (referência); em "reais", o valor fixo */
   valor_centavos: number;
   dia_vencimento: number;
   vigente_desde: string; // YYYY-MM
@@ -185,6 +189,8 @@ export async function definirCombinado(input: CombinadoInput, anterior: Combinad
     versao: anterior ? anterior.versao + 1 : 1,
     versao_de: anterior?.id ?? null,
     criado_em: new Date().toISOString(),
+    modo: input.modo === "sm" ? "sm" : "reais",
+    percentual_sm: input.modo === "sm" ? input.percentual_sm : undefined,
     valor_centavos: input.valor_centavos,
     dia_vencimento: Math.min(31, Math.max(1, Math.round(input.dia_vencimento))),
     vigente_desde: input.vigente_desde,

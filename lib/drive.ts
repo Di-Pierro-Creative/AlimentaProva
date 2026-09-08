@@ -11,6 +11,7 @@
 
 import type { Preparado, Periodo } from "./exportar";
 import { conteudoDaPasta, nomePasta } from "./exportar";
+import { INDICES_EMBUTIDOS, type Indices } from "./indices";
 import { obterBlob } from "./store";
 
 const ESCOPO = "https://www.googleapis.com/auth/drive.file";
@@ -116,12 +117,13 @@ export async function enviarPastaParaDrive(
   prep: Preparado,
   periodo: Periodo | null,
   aoProgredir?: (texto: string) => void,
+  indices: Indices = INDICES_EMBUTIDOS,
 ): Promise<{ pastaId: string; link: string; arquivos: number }> {
   aoProgredir?.("Pedindo acesso ao Google…");
   const token = await obterToken();
 
   // exatamente os mesmos arquivos da pasta .zip
-  const { nomes, arquivos } = conteudoDaPasta(prep, periodo);
+  const { nomes, arquivos } = conteudoDaPasta(prep, periodo, indices);
   const nome = nomePasta(periodo);
 
   aoProgredir?.("Criando a pasta…");

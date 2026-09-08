@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { listarLog } from "@/lib/store";
 import { listarLogCombinado, listarLogPagamentos } from "@/lib/pagamentos";
+import { obterIndices } from "@/lib/indices-cache";
+import { INDICES_EMBUTIDOS, type Indices } from "@/lib/indices";
 import { formatBRL, nomeMes } from "@/lib/format";
 import {
   baixar,
@@ -39,6 +41,7 @@ export default function Exportar() {
   });
   const [emailAdv, setEmailAdv] = useState("");
   const [acesso, setAcesso] = useState<"ocioso" | "dando" | "ok" | "erro">("ocioso");
+  const [indices, setIndices] = useState<Indices>(INDICES_EMBUTIDOS);
 
   useEffect(() => {
     Promise.all([listarLog(), listarLogPagamentos(), listarLogCombinado()])
@@ -51,6 +54,7 @@ export default function Exportar() {
         }
       })
       .catch(() => setErro("Não consegui abrir o cofre neste navegador."));
+    obterIndices().then(setIndices);
   }, []);
 
   const periodo: Periodo | null = useMemo(() => {
@@ -93,7 +97,7 @@ export default function Exportar() {
     setAviso(null);
     setProgresso("");
     try {
-      const r = await montarPasta(prep, periodo, (f, t) => setProgresso(`${f} de ${t} comprovantes`));
+      const r = await montarPasta(prep, periodo, (f, t) => setProgresso(`${f} de ${t} comprovantes`), indices);
       setGerado({ tipo: "pasta", ...r });
     } catch {
       setAviso("Não consegui montar a pasta. Tente de novo.");
@@ -114,7 +118,7 @@ export default function Exportar() {
     setDrive({ estado: "enviando", texto: "Preparando…" });
     setAcesso("ocioso");
     try {
-      const r = await enviarPastaParaDrive(prep, periodo, (t) => setDrive({ estado: "enviando", texto: t }));
+      const r = await enviarPastaParaDrive(prep, periodo, (t) => setDrive({ estado: "enviando", texto: t }), indices);
       setDrive({ estado: "ok", link: r.link, pastaId: r.pastaId, texto: `${r.arquivos} arquivos enviados` });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";

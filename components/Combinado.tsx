@@ -7,7 +7,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { definirCombinado, listarLogCombinado, retirarCombinado } from "@/lib/pagamentos";
-import { combinadoAtual, mesAtual } from "@/lib/pensao";
+import { combinadoAtual, descreverCombinado, mesAtual, valorDoCombinado } from "@/lib/pensao";
+import { salarioMinimoEm } from "@/lib/salario-minimo";
 import { formatBRL, formatDataHora, nomeMes, parseBRL } from "@/lib/format";
 import type { Combinado } from "@/lib/types";
 
@@ -18,7 +19,9 @@ export default function CombinadoTela() {
   const [modo, setModo] = useState<"ver" | "editar" | "retirar">("ver");
   const [salvando, setSalvando] = useState(false);
 
+  const [base, setBase] = useState<"reais" | "sm">("reais");
   const [valorTexto, setValorTexto] = useState("");
+  const [pctTexto, setPctTexto] = useState("");
   const [dia, setDia] = useState("10");
   const [desde, setDesde] = useState(mesAtual());
   const [observacao, setObservacao] = useState("");
@@ -40,7 +43,9 @@ export default function CombinadoTela() {
 
   function abrirEdicao() {
     if (atual) {
+      setBase(atual.modo === "sm" ? "sm" : "reais");
       setValorTexto((atual.valor_centavos / 100).toFixed(2).replace(".", ","));
+      setPctTexto(atual.percentual_sm ? String(atual.percentual_sm).replace(".", ",") : "");
       setDia(String(atual.dia_vencimento));
       setDesde(atual.vigente_desde);
       setObservacao(atual.observacao ?? "");
@@ -50,18 +55,30 @@ export default function CombinadoTela() {
     setModo("editar");
   }
 
-  const valor = useMemo(() => parseBRL(valorTexto), [valorTexto]);
+  const valorReais = useMemo(() => parseBRL(valorTexto), [valorTexto]);
+  // em % do mínimo aceita acima de 100 (um salário e meio = 150)
+  const pct = useMemo(() => {
+    const n = Number(pctTexto.replace(",", ".").replace(/[^\d.]/g, ""));
+    return Number.isFinite(n) && n > 0 && n <= 1000 ? Math.round(n * 100) / 100 : null;
+  }, [pctTexto]);
+  const smHoje = salarioMinimoEm(mesAtual());
+  const valorSmHoje = pct !== null && smHoje ? Math.round((smHoje.valor_centavos * pct) / 100) : null;
+  const valor = base === "sm" ? valorSmHoje : valorReais;
   const diaNum = Number(dia);
   const diaOk = Number.isInteger(diaNum) && diaNum >= 1 && diaNum <= 31;
   const desdeOk = /^\d{4}-\d{2}$/.test(desde);
-  const podeGuardar = !salvando && valor !== null && valor > 0 && diaOk && desdeOk;
+  const podeGuardar = !salvando && valor !== null && valor > 0 && diaOk && desdeOk && (base === "reais" || pct !== null);
 
   async function guardar() {
     if (!podeGuardar || valor === null) return;
     setSalvando(true);
     setErro(null);
     try {
-      await definirCombinado({ valor_centavos: valor, dia_vencimento: diaNum, vigente_desde: desde, observacao }, ultima, motivo);
+      await definirCombinado(
+        { modo: base, percentual_sm: base === "sm" ? (pct ?? undefined) : undefined, valor_centavos: valor, dia_vencimento: diaNum, vigente_desde: desde, observacao },
+        ultima,
+        motivo,
+      );
       router.push("/pensao");
     } catch {
       setErro("Não consegui guardar. Tente de novo.");
@@ -98,10 +115,17 @@ export default function CombinadoTela() {
         {log !== null && modo === "ver" && atual && (
           <section className="rounded-2xl border border-rule bg-surface px-4 py-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-ink-3">Vale hoje</p>
-            <p className="tnum mt-1 text-3xl font-semibold">{formatBRL(atual.valor_centavos)}</p>
+            <p className="tnum mt-1 text-3xl font-semibold">{formatBRL(valorDoCombinado(atual, mesAtual()).valor)}</p>
             <p className="mt-1 text-sm text-ink-2">
+              {atual.modo === "sm" && atual.percentual_sm ? `${descreverCombinado(atual, formatBRL)} · ` : ""}
               vence dia {atual.dia_vencimento} · desde {nomeMes(atual.vigente_desde).toLowerCase()}
             </p>
+            {atual.modo === "sm" && valorDoCombinado(atual, mesAtual()).sm && (
+              <p className="mt-1 text-xs text-ink-3">
+                Salário mínimo de {formatBRL(valorDoCombinado(atual, mesAtual()).sm!.salario_centavos)} ({valorDoCombinado(atual, mesAtual()).sm!.norma}). Quando o
+                mínimo mudar, o valor de cada mês acompanha sozinho.
+              </p>
+            )}
             {atual.observacao && <p className="mt-1 text-sm text-ink-2">{atual.observacao}</p>}
           </section>
         )}
@@ -112,24 +136,68 @@ export default function CombinadoTela() {
               O valor que ficou combinado entre vocês ou fixado pelo juiz. Com ele, cada mês da aba Pensão mostra o que era devido, o que
               entrou e o que faltou. Se o valor mudar (acordo novo, revisional), registre aqui de novo: o anterior fica no histórico.
             </section>
-            <section>
-              <label htmlFor="valor" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-ink-3">
-                Valor mensal
-              </label>
-              <div className="flex items-center gap-2 rounded-2xl border border-rule bg-surface px-4 focus-within:border-accent">
-                <span className="text-lg font-medium text-ink-3">R$</span>
-                <input
-                  id="valor"
-                  type="text"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  placeholder="0,00"
-                  value={valorTexto}
-                  onChange={(e) => setValorTexto(e.target.value)}
-                  className="tnum h-14 w-full bg-transparent text-2xl font-semibold outline-none placeholder:text-ink-3/50"
-                />
+            <section aria-labelledby="lbl-modo">
+              <span id="lbl-modo" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-ink-3">
+                Como foi fixado
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                {(["reais", "sm"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setBase(m)}
+                    aria-pressed={base === m}
+                    className={["h-11 rounded-xl border px-3 text-sm font-semibold", base === m ? "border-accent bg-accent text-white" : "border-rule bg-surface text-ink"].join(" ")}
+                  >
+                    {m === "reais" ? "Valor em reais" : "% do salário mínimo"}
+                  </button>
+                ))}
               </div>
             </section>
+            {base === "reais" ? (
+              <section>
+                <label htmlFor="valor" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-ink-3">
+                  Valor mensal
+                </label>
+                <div className="flex items-center gap-2 rounded-2xl border border-rule bg-surface px-4 focus-within:border-accent">
+                  <span className="text-lg font-medium text-ink-3">R$</span>
+                  <input
+                    id="valor"
+                    type="text"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    placeholder="0,00"
+                    value={valorTexto}
+                    onChange={(e) => setValorTexto(e.target.value)}
+                    className="tnum h-14 w-full bg-transparent text-2xl font-semibold outline-none placeholder:text-ink-3/50"
+                  />
+                </div>
+              </section>
+            ) : (
+              <section>
+                <label htmlFor="pct" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-ink-3">
+                  Percentual do salário mínimo
+                </label>
+                <div className="flex items-center gap-2 rounded-2xl border border-rule bg-surface px-4 focus-within:border-accent">
+                  <input
+                    id="pct"
+                    type="text"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    placeholder="30"
+                    value={pctTexto}
+                    onChange={(e) => setPctTexto(e.target.value)}
+                    className="tnum h-14 w-full bg-transparent text-2xl font-semibold outline-none placeholder:text-ink-3/50"
+                  />
+                  <span className="text-lg font-medium text-ink-3">%</span>
+                </div>
+                <p className="mt-1 text-xs text-ink-3">
+                  {valorSmHoje !== null && smHoje
+                    ? `Hoje: ${formatBRL(valorSmHoje)} (${pctTexto.trim()}% de ${formatBRL(smHoje.valor_centavos)}, ${smHoje.norma}). Em cada mês o app usa o mínimo vigente naquele mês.`
+                    : "Ex.: 30 para 30% · 150 para um salário e meio. O app calcula o valor de cada mês com o mínimo vigente."}
+                </p>
+              </section>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <section>
                 <label htmlFor="dia" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-ink-3">
@@ -218,7 +286,7 @@ export default function CombinadoTela() {
                 <li key={c.id} className="rounded-2xl border border-rule bg-surface px-4 py-3 text-sm">
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="font-semibold">
-                      v{c.versao} · {c.retirada ? "retirado" : `${formatBRL(c.valor_centavos)} · dia ${c.dia_vencimento} · desde ${nomeMes(c.vigente_desde).toLowerCase()}`}
+                      v{c.versao} · {c.retirada ? "retirado" : `${descreverCombinado(c, formatBRL)} · dia ${c.dia_vencimento} · desde ${nomeMes(c.vigente_desde).toLowerCase()}`}
                     </span>
                     <span className="tnum shrink-0 text-xs text-ink-3">{formatDataHora(c.criado_em)}</span>
                   </div>
