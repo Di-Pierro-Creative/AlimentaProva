@@ -1,8 +1,8 @@
-# Cofre
+# AlimentaProva
 
 Cofre de provas para pensão alimentícia. Quem administra a pensão registra, no dia, cada despesa do filho (com comprovante) e cada pagamento de pensão que entra — e, quando o advogado pedir, exporta a pasta pronta.
 
-Publicado em https://cofre-flax.vercel.app (PWA: "Adicionar à tela inicial" no celular).
+Código: github.com/Di-Pierro-Creative/AlimentaProva · Publicado em https://cofre-flax.vercel.app (PWA: "Adicionar à tela inicial" no celular).
 
 ## Princípios que o código carrega
 

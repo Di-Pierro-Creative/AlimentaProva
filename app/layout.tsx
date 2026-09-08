@@ -3,12 +3,12 @@ import "./globals.css";
 import Sincronizador from "@/components/Sincronizador";
 
 export const metadata: Metadata = {
-  title: "Cofre",
+  title: "AlimentaProva",
   description: "Registre as despesas do seu filho com comprovante, em vinte segundos. Tudo datado, tudo guardado.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "Cofre",
+    title: "AlimentaProva",
     statusBarStyle: "default",
   },
   icons: {

@@ -1,4 +1,4 @@
--- Cofre — esquema da conta na nuvem (Supabase)
+-- AlimentaProva — esquema da conta na nuvem (Supabase)
 -- Colar inteiro no SQL Editor do projeto e executar uma vez.
 --
 -- Princípio: o banco é APPEND-ONLY. Há política para ler e inserir; não há

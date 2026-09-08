@@ -377,7 +377,7 @@ export function gerarIndice(
   const total = ativas.reduce((s, d) => s + d.valor_centavos, 0);
   const totalPensao = pagamentos.reduce((s, p) => s + p.valor_centavos, 0);
   const l: string[] = [];
-  l.push("COFRE — PASTA DE DESPESAS DO FILHO E PENSÃO RECEBIDA");
+  l.push("ALIMENTAPROVA — PASTA DE DESPESAS DO FILHO E PENSÃO RECEBIDA");
   l.push("");
   l.push(`Gerada em: ${dataHoraBR(agora.toISOString())} (horário do aparelho)`);
   l.push(`Período: ${periodo ? `${periodo.de} a ${periodo.ate}` : "todo o acervo"}`);
@@ -424,7 +424,7 @@ export function gerarIndice(
 
 export function nomePasta(periodo: Periodo | null): string {
   const hoje = new Date().toISOString().slice(0, 10);
-  return periodo ? `Cofre_${periodo.de}_a_${periodo.ate}` : `Cofre_tudo_${hoje}`;
+  return periodo ? `AlimentaProva_${periodo.de}_a_${periodo.ate}` : `AlimentaProva_tudo_${hoje}`;
 }
 
 /** Tudo que entra na pasta, já filtrado pelo período e com os nomes de arquivo decididos. */

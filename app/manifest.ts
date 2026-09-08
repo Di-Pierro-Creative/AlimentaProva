@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Cofre — despesas do seu filho, comprovadas",
-    short_name: "Cofre",
+    name: "AlimentaProva — despesas do seu filho e pensão, comprovadas",
+    short_name: "AlimentaProva",
     description: "Registre as despesas do seu filho com comprovante, em vinte segundos.",
     start_url: "/",
     display: "standalone",

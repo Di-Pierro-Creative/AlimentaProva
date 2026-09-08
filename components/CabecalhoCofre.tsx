@@ -28,7 +28,7 @@ export default function CabecalhoCofre({ aba }: { aba: Aba }) {
     <header className="safe-t sticky top-0 z-10 border-b border-rule bg-paper/95 px-4 pb-2 backdrop-blur">
       <div className="flex items-center justify-between">
         <div className="flex items-baseline gap-2">
-          <h1 className="text-lg font-semibold tracking-tight">Cofre</h1>
+          <h1 className="text-lg font-semibold tracking-tight">AlimentaProva</h1>
           <Link href="/conta" className="rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-medium text-accent">
             {rotulo}
           </Link>

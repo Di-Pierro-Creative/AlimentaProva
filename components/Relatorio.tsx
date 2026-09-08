@@ -98,7 +98,7 @@ export default function Relatorio() {
         {prep && (
           <>
             <header className="border-b-2 border-ink pb-3">
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-ink-3">Cofre · demonstrativo de despesas{temPensao ? " e pensão" : ""}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-ink-3">AlimentaProva · demonstrativo de despesas{temPensao ? " e pensão" : ""}</p>
               <h1 className="mt-1 text-2xl font-semibold tracking-tight">Despesas do filho{temPensao ? " e pensão recebida" : ""} — {tituloPeriodo}</h1>
               <p className="mt-1 text-xs text-ink-2">
                 Gerado em {formatDataHora(geradoEm)} · {ativas.length} {ativas.length === 1 ? "despesa" : "despesas"} · {comComprovante} com comprovante

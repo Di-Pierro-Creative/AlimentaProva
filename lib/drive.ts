@@ -1,7 +1,7 @@
 // Google Drive: manda a pasta de exportação para o Drive DA CLIENTE (não do
 // advogado) e, se ela quiser, dá acesso de leitura ao advogado por e-mail.
 //
-// Tudo acontece no navegador, direto entre o aparelho e o Google — o Cofre não
+// Tudo acontece no navegador, direto entre o aparelho e o Google — o AlimentaProva não
 // tem servidor no meio. Escopo `drive.file`: o app só enxerga o que ele mesmo
 // criou; nunca lê o resto do Drive da pessoa.
 //

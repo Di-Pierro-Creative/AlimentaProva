@@ -105,7 +105,7 @@ export default function Exportar() {
 
   async function acaoCompartilhar() {
     if (!gerado) return;
-    const ok = await compartilhar(gerado.blob, gerado.nome, "Despesas do filho — Cofre");
+    const ok = await compartilhar(gerado.blob, gerado.nome, "Despesas do filho — AlimentaProva");
     if (!ok) setAviso("O compartilhamento não abriu. Use Baixar e envie o arquivo pelo app que preferir.");
   }
 
@@ -132,7 +132,7 @@ export default function Exportar() {
     setAcesso("dando");
     try {
       const token = await obterToken();
-      await compartilharCom(token, drive.pastaId, emailAdv, "Pasta de despesas do filho, organizada no Cofre. Planilha, comprovantes originais e LEIA-ME com os selos.");
+      await compartilharCom(token, drive.pastaId, emailAdv, "Pasta de despesas do filho e pensão recebida, organizada no AlimentaProva. Planilhas, comprovantes originais e LEIA-ME com os selos.");
       setAcesso("ok");
     } catch {
       setAcesso("erro");
@@ -257,7 +257,7 @@ export default function Exportar() {
                   <>
                     <p className="mt-1 text-xs text-ink-2">
                       Cria no <strong>seu</strong> Google Drive a pasta completa, já aberta (planilha, comprovantes renomeados, LEIA-ME), sem zip.
-                      Depois você dá acesso ao advogado pelo e-mail dele. O Cofre só enxerga a pasta que ele mesmo criou.
+                      Depois você dá acesso ao advogado pelo e-mail dele. O AlimentaProva só enxerga a pasta que ele mesmo criou.
                     </p>
                     <button
                       type="button"
