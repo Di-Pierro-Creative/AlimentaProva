@@ -1,5 +1,5 @@
-import FilhoTela from "@/components/FilhoTela";
+import Filhos from "@/components/Filhos";
 
-export default function NovoFilhoPage() {
-  return <FilhoTela />;
+export default function FilhosPage() {
+  return <Filhos />;
 }
