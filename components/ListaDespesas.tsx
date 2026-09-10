@@ -87,7 +87,7 @@ export default function ListaDespesas() {
             </div>
             <h2 className="text-lg font-semibold">Seu cofre está vazio</h2>
             <p className="mx-auto mt-2 max-w-xs text-sm text-ink-2">
-              Cada despesa do seu filho, com o comprovante, guardada no dia em que acontece. Quando alguém pedir, está tudo aqui.
+              Tire a foto do comprovante — de hoje ou de meses atrás. O app lê o valor e a data e organiza tudo pelo mês da despesa. Quando o advogado pedir, está aqui.
             </p>
             {filhosAtivos.length === 0 && (
               <Link href="/filhos/novo" className="mt-5 inline-block text-sm font-medium text-accent">
@@ -119,14 +119,17 @@ export default function ListaDespesas() {
                 </Link>
               </div>
             ) : (
-              <div className="mb-3 flex items-center justify-between text-xs">
-                <span className="text-ink-3">
+              // Um filho só: a linha inteira abre o perfil dele (editar, tamanhos, histórico).
+              // Nenhum: convite para cadastrar.
+              <Link
+                href={filhosAtivos.length === 1 ? `/filhos/${filhosAtivos[0].linhagem}` : "/filhos/novo"}
+                className="mb-3 flex items-center justify-between rounded-xl border border-rule bg-surface px-3 py-2 text-xs active:bg-rule/40"
+              >
+                <span className={filhosAtivos.length === 1 ? "font-semibold text-ink" : "text-ink-3"}>
                   {filhosAtivos.length === 1 ? `${filhosAtivos[0].nome}${idade(filhosAtivos[0].nascimento) ? ` · ${idade(filhosAtivos[0].nascimento)}` : ""}` : "Nenhum filho cadastrado"}
                 </span>
-                <Link href={filhosAtivos.length ? "/filhos" : "/filhos/novo"} className="font-medium text-accent">
-                  {filhosAtivos.length ? "filhos ›" : "＋ cadastrar filho"}
-                </Link>
-              </div>
+                <span className="font-medium text-accent">{filhosAtivos.length === 1 ? "ver perfil ›" : "＋ cadastrar filho"}</span>
+              </Link>
             )}
 
             <div className="mb-5 grid grid-cols-2 gap-2">

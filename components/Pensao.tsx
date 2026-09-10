@@ -86,8 +86,8 @@ export default function Pensao() {
             </div>
             <h2 className="text-lg font-semibold">Nenhum pagamento registrado</h2>
             <p className="mx-auto mt-2 max-w-xs text-sm text-ink-2">
-              Cada pensão que entrar, com o print do Pix ou do extrato, guardada com data. Ao lado das despesas, mostra o que a
-              pensão cobre — e o que não cobre.
+              O print do Pix ou do extrato de cada pensão que entrou — deste mês ou dos anteriores. Ao lado das despesas, mostra o
+              que a pensão cobre — e o que não cobre.
             </p>
             <Link href="/pensao/combinado" className="mt-5 inline-block text-sm font-medium text-accent">
               Definir o valor combinado da pensão

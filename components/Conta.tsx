@@ -8,8 +8,9 @@ import { aoMudarSessao, confirmarCodigo, pedirCodigo, sair, type Sessao } from "
 import { contaConfigurada } from "@/lib/supabase";
 import { observarSync, sincronizar, type EstadoSync } from "@/lib/sync";
 import { formatDataHora } from "@/lib/format";
+import { apagarConta, limparAparelho, type ResultadoApagar } from "@/lib/apagar";
 
-export default function Conta() {
+export default function Conta({ abrirApagar = false }: { abrirApagar?: boolean }) {
   const configurada = contaConfigurada();
   const [sessao, setSessao] = useState<Sessao | null | undefined>(undefined);
   const [sync, setSync] = useState<EstadoSync | null>(null);
@@ -208,7 +209,132 @@ export default function Conta() {
             {erro}
           </p>
         )}
+
+        {sessao !== undefined && <Apagar logada={!!sessao} configurada={configurada} aberto={abrirApagar} />}
+
+        <p className="pt-2 text-center text-[11px] text-ink-3">
+          <Link href="/privacidade" className="underline">
+            Política de privacidade
+          </Link>
+          {" · "}
+          <Link href="/apagar-conta" className="underline">
+            Apagar conta
+          </Link>
+        </p>
       </main>
     </div>
+  );
+}
+
+// Apagar: a única forma de remover dados. Com conta: apaga a nuvem inteira e o
+// aparelho; sem conta (ou deslogada): só o aparelho. Confirmação digitando APAGAR.
+function Apagar({ logada, configurada, aberto: abertoInicial }: { logada: boolean; configurada: boolean; aberto: boolean }) {
+  const [aberto, setAberto] = useState(abertoInicial);
+  const [confirmacao, setConfirmacao] = useState("");
+  const [apagando, setApagando] = useState(false);
+  const [resultado, setResultado] = useState<ResultadoApagar | { ok: true; local: true } | null>(null);
+
+  const naNuvem = configurada && logada;
+  const pronto = confirmacao.trim().toUpperCase() === "APAGAR" && !apagando;
+
+  async function apagar() {
+    if (!pronto) return;
+    setApagando(true);
+    try {
+      if (naNuvem) {
+        setResultado(await apagarConta());
+      } else {
+        await limparAparelho();
+        setResultado({ ok: true, local: true });
+      }
+    } finally {
+      setApagando(false);
+    }
+  }
+
+  if (resultado?.ok) {
+    return (
+      <section className="rounded-2xl border border-ok/30 bg-ok-soft px-4 py-4 text-sm text-ok">
+        <p className="font-semibold">Pronto. Tudo apagado.</p>
+        <p className="mt-1">
+          {"local" in resultado
+            ? "Os dados deste aparelho foram removidos."
+            : `Removidos da nuvem: ${resultado.registros} registro(s) e ${resultado.arquivos} comprovante(s), além do seu e-mail. Este aparelho também foi limpo.`}
+        </p>
+        <Link href="/" className="mt-3 inline-block font-semibold underline">
+          Voltar ao início
+        </Link>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-2xl border border-rule bg-surface px-4 py-4">
+      <button type="button" onClick={() => setAberto((v) => !v)} className="flex w-full items-center justify-between text-left" aria-expanded={aberto}>
+        <span className="text-sm font-semibold text-risk">{naNuvem ? "Apagar minha conta" : "Apagar os dados deste aparelho"}</span>
+        <span className="text-ink-3" aria-hidden="true">
+          {aberto ? "–" : "+"}
+        </span>
+      </button>
+
+      {aberto && (
+        <div className="mt-3 space-y-3 text-sm text-ink-2">
+          {naNuvem ? (
+            <p>
+              Remove <strong>tudo</strong> da nuvem — despesas, pagamentos, filhos, comprovantes e o seu e-mail — e limpa este aparelho.
+              Não tem volta: o cofre é seu, e apagar é a única forma de remover dados dele.
+            </p>
+          ) : (
+            <p>
+              Remove os registros e comprovantes guardados <strong>neste aparelho</strong>.
+              {configurada && " Para apagar a conta na nuvem, entre com o seu e-mail primeiro."}
+            </p>
+          )}
+          <p className="rounded-xl bg-paper px-3 py-2 text-xs text-ink-3">
+            Antes, se quiser guardar uma cópia:{" "}
+            <Link href="/exportar" className="font-medium text-accent underline">
+              exportar a pasta completa
+            </Link>
+            .
+          </p>
+          <label htmlFor="confirmar-apagar" className="block text-xs font-semibold uppercase tracking-wide text-ink-3">
+            Digite APAGAR para confirmar
+          </label>
+          <input
+            id="confirmar-apagar"
+            type="text"
+            autoComplete="off"
+            autoCapitalize="characters"
+            value={confirmacao}
+            onChange={(e) => setConfirmacao(e.target.value)}
+            placeholder="APAGAR"
+            className="h-12 w-full rounded-2xl border border-rule bg-paper px-4 text-base tracking-widest outline-none focus:border-risk"
+          />
+          <button
+            type="button"
+            onClick={apagar}
+            disabled={!pronto}
+            className="h-12 w-full rounded-2xl bg-risk text-base font-semibold text-white disabled:bg-rule disabled:text-ink-3"
+          >
+            {apagando ? "Apagando…" : naNuvem ? "Apagar minha conta" : "Apagar deste aparelho"}
+          </button>
+          {resultado && !resultado.ok && (
+            <p role="alert" className="rounded-2xl border border-risk/30 bg-risk-soft px-4 py-3 text-sm text-risk">
+              {resultado.motivo === "nao_configurado" && (
+                <>
+                  Apagar pela nuvem ainda não está ligado neste site. Peça pelo e-mail da{" "}
+                  <Link href="/privacidade" className="underline">
+                    política de privacidade
+                  </Link>
+                  ; atendemos em até 15 dias.
+                </>
+              )}
+              {resultado.motivo === "sem_sessao" && "Sua sessão venceu. Entre de novo e repita."}
+              {resultado.motivo === "falhou" && `Não consegui apagar${resultado.detalhe ? ` (${resultado.detalhe})` : ""}. Tente de novo.`}
+            </p>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
