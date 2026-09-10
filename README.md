@@ -15,6 +15,8 @@ Código: github.com/Di-Pierro-Creative/AlimentaProva · Publicado em https://ali
 
 ## O que faz
 
+**Perfil** (botão no cabeçalho) — filhos, conta na nuvem, exportar, privacidade, apagar.
+
 **Filhos** — perfil por filho (nome, nascimento → idade, tamanhos, escola). Cada despesa diz de quem é; lista, planilha e relatório saem por filho. Uma pensão cobre todos os filhos (irmãos do mesmo pai).
 
 **Despesas** — foto/print do comprovante → leitura automática (valor, data, categoria sugerida) → conferir → guardar. Print de fatura de cartão vira vários registros, um por lançamento, com o mesmo comprovante. Rateio: quando só uma parte é do filho (restaurante, mercado), grava o total, o percentual e o critério.
@@ -66,6 +68,7 @@ app/                      rotas (App Router)
   despesa/[id]            detalhe da despesa    → components/DetalheDespesa
   exportar/, relatorio/   exportação            → components/Exportar, Relatorio
   filhos/, filhos/novo, filhos/[id]   perfis dos filhos → components/Filhos, FilhoTela
+  perfil/                 perfil da genitora: filhos, conta, dados → components/Perfil
   conta/                  conta (+ apagar)      → components/Conta
   apagar-conta/           link público p/ apagar a conta (exigência da loja)
   privacidade/            política de privacidade (LGPD)
@@ -74,7 +77,7 @@ app/                      rotas (App Router)
   api/ler-comprovante     leitura automática (servidor)
   api/indices             INPC e IPCA do IBGE, com cache (servidor)
 components/
-  CabecalhoCofre          cabeçalho com as abas e o estado da conta
+  CabecalhoCofre          cabeçalho: Perfil (ponto = estado da conta), Exportar, abas
   GraficoCustoPensao      gráfico custo × pensão (SVG, sem biblioteca)
   SeletorFilho            chips "de quem é" (usado na captura e na edição)
   RateioPainel, Sincronizador, Offline (liga o service worker)

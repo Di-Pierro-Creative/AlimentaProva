@@ -1,10 +1,5 @@
-import { Suspense } from "react";
-import Pensao from "@/components/Pensao";
+import CombinadoTela from "@/components/Combinado";
 
-export default function PensaoPage() {
-  return (
-    <Suspense fallback={<p className="px-4 py-10 text-center text-sm text-ink-3">Abrindo o cofre…</p>}>
-      <Pensao />
-    </Suspense>
-  );
+export default function CombinadoPage() {
+  return <CombinadoTela />;
 }

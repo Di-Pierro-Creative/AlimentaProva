@@ -80,6 +80,46 @@ export default function ListaDespesas() {
 
         {itens === null && !erro && <p className="py-10 text-center text-sm text-ink-3">Abrindo o cofre…</p>}
 
+        {/* Linha dos filhos — aparece sempre, com ou sem despesas: é por aqui que se chega ao perfil de cada um. */}
+        {itens &&
+          (variosFilhos ? (
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              {itens.length > 0 && (
+                <>
+                  <Chip ativo={filtro === null} onClick={() => setFiltro(null)}>
+                    Todos
+                  </Chip>
+                  {filhosAtivos.map((f) => (
+                    <Chip key={f.linhagem} ativo={filtro === f.linhagem} onClick={() => setFiltro(f.linhagem)}>
+                      {f.nome}
+                    </Chip>
+                  ))}
+                  {itens.some((d) => !d.filho) && (
+                    <Chip ativo={filtro === "sem"} onClick={() => setFiltro("sem")}>
+                      sem filho definido
+                    </Chip>
+                  )}
+                </>
+              )}
+              {itens.length === 0 && <span className="text-xs text-ink-3">{filhosAtivos.map((f) => f.nome).join(" · ")}</span>}
+              <Link href="/perfil" className="ml-auto text-xs font-medium text-accent">
+                perfis dos filhos ›
+              </Link>
+            </div>
+          ) : (
+            // Um filho só: a linha inteira abre o perfil dele (editar, tamanhos, histórico).
+            // Nenhum: convite para cadastrar.
+            <Link
+              href={filhosAtivos.length === 1 ? `/filhos/${filhosAtivos[0].linhagem}` : "/filhos/novo"}
+              className="mb-3 flex items-center justify-between rounded-xl border border-rule bg-surface px-3 py-2 text-xs active:bg-rule/40"
+            >
+              <span className={filhosAtivos.length === 1 ? "font-semibold text-ink" : "text-ink-3"}>
+                {filhosAtivos.length === 1 ? `${filhosAtivos[0].nome}${idade(filhosAtivos[0].nascimento) ? ` · ${idade(filhosAtivos[0].nascimento)}` : ""}` : "Nenhum filho cadastrado"}
+              </span>
+              <span className="font-medium text-accent">{filhosAtivos.length === 1 ? "ver perfil ›" : "＋ cadastrar filho"}</span>
+            </Link>
+          ))}
+
         {itens && itens.length === 0 && (
           <div className="py-14 text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-accent-soft text-accent">
@@ -89,49 +129,11 @@ export default function ListaDespesas() {
             <p className="mx-auto mt-2 max-w-xs text-sm text-ink-2">
               Tire uma foto do comprovante ou faça uma captura de tela — seja de hoje ou de meses atrás. O app lê o valor e a data, categoriza e organiza tudo. Quando o advogado pedir, está tudo aqui.
             </p>
-            {filhosAtivos.length === 0 && (
-              <Link href="/filhos/novo" className="mt-5 inline-block text-sm font-medium text-accent">
-                Comece cadastrando seu filho (só o nome basta)
-              </Link>
-            )}
           </div>
         )}
 
         {itens && itens.length > 0 && (
           <>
-            {variosFilhos ? (
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <Chip ativo={filtro === null} onClick={() => setFiltro(null)}>
-                  Todos
-                </Chip>
-                {filhosAtivos.map((f) => (
-                  <Chip key={f.linhagem} ativo={filtro === f.linhagem} onClick={() => setFiltro(f.linhagem)}>
-                    {f.nome}
-                  </Chip>
-                ))}
-                {(itens ?? []).some((d) => !d.filho) && (
-                  <Chip ativo={filtro === "sem"} onClick={() => setFiltro("sem")}>
-                    sem filho definido
-                  </Chip>
-                )}
-                <Link href="/filhos" className="ml-auto text-xs font-medium text-accent">
-                  filhos ›
-                </Link>
-              </div>
-            ) : (
-              // Um filho só: a linha inteira abre o perfil dele (editar, tamanhos, histórico).
-              // Nenhum: convite para cadastrar.
-              <Link
-                href={filhosAtivos.length === 1 ? `/filhos/${filhosAtivos[0].linhagem}` : "/filhos/novo"}
-                className="mb-3 flex items-center justify-between rounded-xl border border-rule bg-surface px-3 py-2 text-xs active:bg-rule/40"
-              >
-                <span className={filhosAtivos.length === 1 ? "font-semibold text-ink" : "text-ink-3"}>
-                  {filhosAtivos.length === 1 ? `${filhosAtivos[0].nome}${idade(filhosAtivos[0].nascimento) ? ` · ${idade(filhosAtivos[0].nascimento)}` : ""}` : "Nenhum filho cadastrado"}
-                </span>
-                <span className="font-medium text-accent">{filhosAtivos.length === 1 ? "ver perfil ›" : "＋ cadastrar filho"}</span>
-              </Link>
-            )}
-
             <div className="mb-5 grid grid-cols-2 gap-2">
               <Tile rotulo={filtro && filtro !== "sem" ? `Total · ${nomes.get(filtro) ?? ""}` : "Total registrado"} valor={formatBRL(totalGeral)} />
               <Tile rotulo="Com comprovante" valor={`${comComprovante} de ${ativas.length}`} />

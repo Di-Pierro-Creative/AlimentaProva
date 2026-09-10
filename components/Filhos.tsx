@@ -25,7 +25,7 @@ export default function Filhos() {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="safe-t sticky top-0 z-10 flex items-center justify-between border-b border-rule bg-paper/95 px-4 pb-3 backdrop-blur">
-        <Link href="/" className="-ml-2 rounded-lg px-2 py-2 text-sm font-medium text-ink-2 active:bg-rule/50" aria-label="Voltar">
+        <Link href="/perfil" className="-ml-2 rounded-lg px-2 py-2 text-sm font-medium text-ink-2 active:bg-rule/50" aria-label="Voltar">
           ← Voltar
         </Link>
         <h1 className="text-base font-semibold">Filhos</h1>
