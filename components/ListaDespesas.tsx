@@ -87,7 +87,7 @@ export default function ListaDespesas() {
             </div>
             <h2 className="text-lg font-semibold">Seu cofre está vazio</h2>
             <p className="mx-auto mt-2 max-w-xs text-sm text-ink-2">
-              Tire a foto do comprovante — de hoje ou de meses atrás. O app lê o valor e a data e organiza tudo pelo mês da despesa. Quando o advogado pedir, está aqui.
+              Tire uma foto do comprovante ou faça uma captura de tela — seja de hoje ou de meses atrás. O app lê o valor e a data, categoriza e organiza tudo. Quando o advogado pedir, está tudo aqui.
             </p>
             {filhosAtivos.length === 0 && (
               <Link href="/filhos/novo" className="mt-5 inline-block text-sm font-medium text-accent">
