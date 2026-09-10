@@ -15,7 +15,8 @@ import { contaConfigurada, supabase } from "./supabase";
 import { sessaoAtual } from "./conta";
 import { definirBuscadorRemoto, gravarVindaDaNuvem, guardarBlobLocal, listarLog, obterBlobLocal } from "./store";
 import { gravarCombinadoVindoDaNuvem, gravarPagamentoVindoDaNuvem, listarLogCombinado, listarLogPagamentos } from "./pagamentos";
-import type { Combinado, Comprovante, Despesa, Pagamento, Registro, TipoRegistro } from "./types";
+import { gravarFilhoVindoDaNuvem, listarLogFilhos } from "./filhos";
+import type { Combinado, Comprovante, Despesa, Filho, Pagamento, Registro, TipoRegistro } from "./types";
 
 // o que já subiu para QUAL conta: "reg:<uid>:<id>" / "blob:<uid>:<blobKey>"
 const marcas = createStore("cofre-sync", "marcas");
@@ -30,6 +31,7 @@ const FONTES: Fonte[] = [
   { tipo: "despesa", log: listarLog, gravar: (r) => gravarVindaDaNuvem(r as Despesa) },
   { tipo: "pagamento", log: listarLogPagamentos, gravar: (r) => gravarPagamentoVindoDaNuvem(r as Pagamento) },
   { tipo: "combinado", log: listarLogCombinado, gravar: (r) => gravarCombinadoVindoDaNuvem(r as Combinado) },
+  { tipo: "filho", log: listarLogFilhos, gravar: (r) => gravarFilhoVindoDaNuvem(r as Filho) },
 ];
 
 export interface EstadoSync {

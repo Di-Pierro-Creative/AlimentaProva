@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { listarLog } from "@/lib/store";
 import { listarLogCombinado, listarLogPagamentos } from "@/lib/pagamentos";
+import { listarLogFilhos } from "@/lib/filhos";
 import { obterIndices } from "@/lib/indices-cache";
 import { INDICES_EMBUTIDOS, type Indices } from "@/lib/indices";
 import { formatBRL, nomeMes } from "@/lib/format";
@@ -44,9 +45,9 @@ export default function Exportar() {
   const [indices, setIndices] = useState<Indices>(INDICES_EMBUTIDOS);
 
   useEffect(() => {
-    Promise.all([listarLog(), listarLogPagamentos(), listarLogCombinado()])
-      .then(([log, logPag, logComb]) => {
-        const p = preparar(log, logPag, logComb);
+    Promise.all([listarLog(), listarLogPagamentos(), listarLogCombinado(), listarLogFilhos()])
+      .then(([log, logPag, logComb, logFilhos]) => {
+        const p = preparar(log, logPag, logComb, logFilhos);
         setPrep(p);
         if (p.meses.length) {
           setDe(p.meses[0]);

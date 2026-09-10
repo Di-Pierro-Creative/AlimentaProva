@@ -7,10 +7,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import Link from "next/link";
 import { CATEGORIAS, categoria as infoCategoria } from "@/lib/categorias";
 import { devolverDespesa, novaVersao, obterBlob, obterLinhagem, retirarDespesa } from "@/lib/store";
-import type { CategoriaId, Despesa } from "@/lib/types";
+import type { CategoriaId, Despesa, FilhoAtual } from "@/lib/types";
 import { formatBRL, formatBytes, formatData, formatDataHora, formatDataLonga, parseBRL } from "@/lib/format";
 import { descreverRateio, parteDoFilho } from "@/lib/rateio";
+import { listarFilhosComRetirados, nomeDoFilho } from "@/lib/filhos";
 import RateioPainel from "./RateioPainel";
+import SeletorFilho from "./SeletorFilho";
 
 type Modo = "ver" | "editar" | "retirar";
 
@@ -31,6 +33,14 @@ export default function DetalheDespesa({ linhagem }: { linhagem: string }) {
   const [observacao, setObservacao] = useState("");
   const [motivo, setMotivo] = useState("");
   const [novoArquivo, setNovoArquivo] = useState<File | null>(null);
+  // filhos cadastrados (com retirados, para o nome de despesas antigas continuar aparecendo)
+  const [filhos, setFilhos] = useState<FilhoAtual[]>([]);
+  const [filhoSel, setFilhoSel] = useState<string | null>(null);
+  useEffect(() => {
+    listarFilhosComRetirados().then(setFilhos).catch(() => setFilhos([]));
+  }, []);
+  const nomesFilhos = useMemo(() => new Map(filhos.map((f) => [f.linhagem, f.nome])), [filhos]);
+  const filhosAtivos = useMemo(() => filhos.filter((f) => !f.retirada), [filhos]);
   // rateio na edição: o campo Valor é o TOTAL do comprovante quando ativo
   const [rateioAtivo, setRateioAtivo] = useState(false);
   const [rateioPct, setRateioPct] = useState(50);
@@ -82,6 +92,7 @@ export default function DetalheDespesa({ linhagem }: { linhagem: string }) {
     setData(atual.data_do_fato);
     setCategoria(atual.categoria);
     setObservacao(atual.observacao ?? "");
+    setFilhoSel(atual.filho ?? null);
     setMotivo("");
     setNovoArquivo(null);
     setMensagemErro(null);
@@ -121,9 +132,10 @@ export default function DetalheDespesa({ linhagem }: { linhagem: string }) {
       data !== atual.data_do_fato ||
       categoria !== atual.categoria ||
       (observacao.trim() || undefined) !== atual.observacao ||
+      (filhoSel ?? undefined) !== atual.filho ||
       !!novoArquivo
     );
-  }, [atual, parteNova, rateioAtivo, rateioPct, rateioCriterio, data, categoria, observacao, novoArquivo]);
+  }, [atual, parteNova, rateioAtivo, rateioPct, rateioCriterio, data, categoria, observacao, filhoSel, novoArquivo]);
 
   const podeGuardar = estado !== "salvando" && parteNova !== null && parteNova > 0 && !!data && houveMudanca;
 
@@ -140,6 +152,7 @@ export default function DetalheDespesa({ linhagem }: { linhagem: string }) {
         data_do_fato: data,
         categoria,
         observacao,
+        filho: filhoSel,
         motivo,
         arquivo: novoArquivo,
       });
@@ -318,6 +331,7 @@ export default function DetalheDespesa({ linhagem }: { linhagem: string }) {
                     {cat.nome}
                   </span>
                 </Linha>
+                {(filhos.length > 0 || atual.filho) && <Linha rotulo="De quem">{nomeDoFilho(atual.filho, nomesFilhos, filhosAtivos.length > 1 ? "todos" : "da família")}</Linha>}
                 <Linha rotulo="Data da despesa">{formatDataLonga(atual.data_do_fato)}</Linha>
                 <Linha rotulo="Entrou no cofre">{formatDataHora(versoes[0].criado_em)}</Linha>
                 {atual.observacao && <Linha rotulo="Observação">{atual.observacao}</Linha>}
@@ -350,7 +364,7 @@ export default function DetalheDespesa({ linhagem }: { linhagem: string }) {
                         <span className="font-semibold">v{v.versao}</span>
                         <span className="tnum text-xs text-ink-3">{formatDataHora(v.criado_em)}</span>
                       </div>
-                      <p className="mt-0.5 text-ink-2">{descreverMudanca(versoes[i - 1], v)}</p>
+                      <p className="mt-0.5 text-ink-2">{descreverMudanca(versoes[i - 1], v, nomesFilhos)}</p>
                       {v.motivo && i > 0 && <p className="mt-0.5 text-xs text-ink-3">Motivo: {v.motivo}</p>}
                     </li>
                   ))}
@@ -440,6 +454,8 @@ export default function DetalheDespesa({ linhagem }: { linhagem: string }) {
                 })}
               </div>
             </section>
+
+            {filhosAtivos.length > 0 && <SeletorFilho filhos={filhosAtivos} valor={filhoSel} onChange={setFilhoSel} />}
 
             <section>
               <label htmlFor="obs" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-ink-3">
@@ -587,7 +603,7 @@ function Linha({ rotulo, children }: { rotulo: string; children: ReactNode }) {
 }
 
 /** Texto curto do que mudou entre uma versão e a anterior. */
-function descreverMudanca(anterior: Despesa | undefined, v: Despesa): string {
+function descreverMudanca(anterior: Despesa | undefined, v: Despesa, nomes: Map<string, string>): string {
   if (!anterior) return v.comprovante ? "Registrada com comprovante" : "Registrada sem comprovante";
   if (v.retirada && !anterior.retirada) return "Retirada do cofre";
   if (!v.retirada && anterior.retirada) return "Devolvida ao cofre";
@@ -596,6 +612,7 @@ function descreverMudanca(anterior: Despesa | undefined, v: Despesa): string {
   if (v.data_do_fato !== anterior.data_do_fato) partes.push(`data ${formatData(anterior.data_do_fato)} → ${formatData(v.data_do_fato)}`);
   if (v.categoria !== anterior.categoria)
     partes.push(`categoria ${infoCategoria(anterior.categoria).nome} → ${infoCategoria(v.categoria).nome}`);
+  if ((v.filho ?? "") !== (anterior.filho ?? "")) partes.push(`de quem ${nomeDoFilho(anterior.filho, nomes)} → ${nomeDoFilho(v.filho, nomes)}`);
   const rA = anterior.rateio ? descreverRateio(anterior.rateio, formatBRL) : null;
   const rV = v.rateio ? descreverRateio(v.rateio, formatBRL) : null;
   if (rA !== rV) partes.push(rV ? `divisão ${rA ? `${rA} → ` : ""}${rV}` : "divisão removida");

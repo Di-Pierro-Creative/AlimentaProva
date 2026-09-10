@@ -81,9 +81,14 @@ export interface Registro {
 }
 
 /** Tipos de registro que o cofre guarda (e a nuvem sincroniza) */
-export type TipoRegistro = "despesa" | "pagamento" | "combinado";
+export type TipoRegistro = "despesa" | "pagamento" | "combinado" | "filho";
 
 export interface Despesa extends Registro {
+  /**
+   * De qual filho é a despesa (linhagem do `Filho`). Ausente = não
+   * especificado / de todos os filhos (despesa da casa, mercado da família).
+   */
+  filho?: string;
   /** YYYY-MM-DD — quando a despesa aconteceu (data_do_fato) */
   data_do_fato: string;
 
@@ -158,3 +163,23 @@ export interface Combinado extends Registro {
   /** de onde vem o valor: "acordo de 03/2025", "sentença", "liminar"… */
   observacao?: string;
 }
+
+// ---------------------------------------------------------------------------
+// Filhos: quem são as crianças. Dados de menor — o mínimo que serve ao dia a
+// dia e ao advogado (nome e idade). Saúde fica de fora do app.
+// ---------------------------------------------------------------------------
+
+export interface Filho extends Registro {
+  /** como a pessoa chama (primeiro nome ou apelido basta) */
+  nome: string;
+  /** YYYY-MM-DD — para mostrar a idade */
+  nascimento?: string;
+  /** tamanho de roupa, texto livre ("8", "M", "10 anos") — só ajuda a comprar */
+  roupa?: string;
+  /** número do calçado */
+  calcado?: string;
+  escola?: string;
+  observacao?: string;
+}
+
+export type FilhoAtual = Filho & { historico: number };

@@ -9,7 +9,8 @@
 // Regra 1 do produto: baixar os próprios arquivos é sempre grátis. A trava de
 // pagamento, quando existir, fica no artefato gerado (pasta/relatório), não aqui.
 
-import type { Combinado, Despesa, Pagamento } from "./types";
+import type { Combinado, Despesa, Filho, Pagamento } from "./types";
+import { filhosAtuais, idade, listarNomes, nomeDoFilho } from "./filhos";
 import { categoria as infoCategoria } from "./categorias";
 import { formatPercentual } from "./rateio";
 import { montarZip, type EntradaZip } from "./zip";
@@ -41,10 +42,14 @@ export interface Preparado {
   pagamentosRetirados: Pagamento[];
   /** log do valor combinado (todas as versões) */
   combinado: Combinado[];
+  /** filhos ativos (versão atual), na ordem de cadastro */
+  filhos: Filho[];
+  /** linhagem do filho → nome atual (inclui retirados, para despesas antigas) */
+  nomesFilhos: Map<string, string>;
 }
 
 /** Do log cru para o que a exportação precisa. */
-export function preparar(log: Despesa[], logPagamentos: Pagamento[] = [], logCombinado: Combinado[] = []): Preparado {
+export function preparar(log: Despesa[], logPagamentos: Pagamento[] = [], logCombinado: Combinado[] = [], logFilhos: Filho[] = []): Preparado {
   const porLinhagem = new Map<string, Despesa[]>();
   for (const d of log) {
     const arr = porLinhagem.get(d.linhagem) ?? [];
@@ -85,7 +90,19 @@ export function preparar(log: Despesa[], logPagamentos: Pagamento[] = [], logCom
   pagamentosRetirados.sort(ordenarP);
 
   const meses = Array.from(new Set([...ativas.map((d) => d.data_do_fato.slice(0, 7)), ...pagamentos.map((p) => p.referencia)])).sort();
-  return { ativas, retiradas, primeiraEntrada, versoes, meses, pagamentos, pagamentosRetirados, combinado: [...logCombinado].sort((a, b) => a.versao - b.versao) };
+  const todosFilhos = filhosAtuais(logFilhos);
+  return {
+    ativas,
+    retiradas,
+    primeiraEntrada,
+    versoes,
+    meses,
+    pagamentos,
+    pagamentosRetirados,
+    combinado: [...logCombinado].sort((a, b) => a.versao - b.versao),
+    filhos: todosFilhos.filter((f) => !f.retirada),
+    nomesFilhos: new Map(todosFilhos.map((f) => [f.linhagem, f.nome])),
+  };
 }
 
 export function mesNoPeriodo(mes: string, p: Periodo | null): boolean {
@@ -203,6 +220,7 @@ const FIM = "\r\n";
 export function gerarCSV(ativas: Despesa[], prep: Preparado, nomes: Map<string, string>): string {
   const cab = [
     "data_da_despesa",
+    "filho",
     "categoria",
     "descricao",
     "valor_parte_do_filho",
@@ -218,6 +236,7 @@ export function gerarCSV(ativas: Despesa[], prep: Preparado, nomes: Map<string, 
   const linhas = ativas.map((d) =>
     [
       dataBR(d.data_do_fato),
+      nomeDoFilho(d.filho, prep.nomesFilhos, prep.filhos.length > 1 ? "todos" : ""),
       infoCategoria(d.categoria).nome,
       d.observacao ?? "",
       centavosCSV(d.valor_centavos),
@@ -234,7 +253,7 @@ export function gerarCSV(ativas: Despesa[], prep: Preparado, nomes: Map<string, 
       .join(";"),
   );
   const total = ativas.reduce((s, d) => s + d.valor_centavos, 0);
-  const rodape = ["TOTAL", "", "", centavosCSV(total)].map(csvCampo).join(";");
+  const rodape = ["TOTAL", "", "", "", centavosCSV(total)].map(csvCampo).join(";");
   return BOM + [cab.join(";"), ...linhas, rodape].join(FIM) + FIM;
 }
 
@@ -425,7 +444,16 @@ export function gerarIndice(
   l.push("");
   l.push(`Gerada em: ${dataHoraBR(agora.toISOString())} (horário do aparelho)`);
   l.push(`Período: ${periodo ? `${periodo.de} a ${periodo.ate}` : "todo o acervo"}`);
+  if (prep.filhos.length) l.push(`Filhos: ${listarNomes(prep.filhos.map((f) => (idade(f.nascimento) ? `${f.nome} (${idade(f.nascimento)})` : f.nome)))}`);
   l.push(`Despesas: ${ativas.length} (${comComprovante} com comprovante) — total da parte do filho: R$ ${centavosCSV(total)}`);
+  if (prep.filhos.length > 1) {
+    for (const f of prep.filhos) {
+      const das = ativas.filter((d) => d.filho === f.linhagem);
+      l.push(`  ${f.nome}: ${das.length} despesas — R$ ${centavosCSV(das.reduce((s, d) => s + d.valor_centavos, 0))}`);
+    }
+    const comuns = ativas.filter((d) => !d.filho);
+    if (comuns.length) l.push(`  de todos / da casa: ${comuns.length} despesas — R$ ${centavosCSV(comuns.reduce((s, d) => s + d.valor_centavos, 0))}`);
+  }
   if (retiradas.length) l.push(`Retiradas do cofre (não contam, listadas em retiradas.csv): ${retiradas.length}`);
   if (pagamentos.length || pagamentosRetirados.length) {
     l.push(`Pagamentos de pensão: ${pagamentos.length} (${pagamentos.filter((p) => p.comprovante).length} com comprovante) — total recebido: R$ ${centavosCSV(totalPensao)}`);
@@ -445,6 +473,7 @@ export function gerarIndice(
   if (pagamentosRetirados.length) l.push("pagamentos_retirados.csv  pagamentos retirados do cofre pela parte, com data e motivo");
   l.push("");
   l.push("COMO LER");
+  if (prep.filhos.length > 1) l.push("filho                  de qual filho é a despesa; \"todos\" = da casa ou de todos os filhos juntos.");
   l.push("valor_parte_do_filho   é o que conta. Quando só uma fração do comprovante é do filho, a planilha");
   l.push("                       traz também o total do comprovante, o percentual e o critério declarado.");
   l.push("registrado_no_cofre_em quando a despesa entrou no cofre (distinto da data da despesa).");

@@ -8,6 +8,8 @@ import { listarAtuais, obterBlob } from "@/lib/store";
 import type { DespesaAtual } from "@/lib/types";
 import { chaveMes, formatBRL, formatData, nomeMes } from "@/lib/format";
 import { formatPercentual } from "@/lib/rateio";
+import { idade, listarFilhosComRetirados } from "@/lib/filhos";
+import type { FilhoAtual } from "@/lib/types";
 import CabecalhoCofre from "./CabecalhoCofre";
 
 export default function ListaDespesas() {
@@ -17,11 +19,17 @@ export default function ListaDespesas() {
   const [itens, setItens] = useState<DespesaAtual[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [mostrarAviso, setMostrarAviso] = useState(salvos > 0);
+  const [filhos, setFilhos] = useState<FilhoAtual[]>([]);
+  /** filtro: null = todos os filhos; linhagem = só um; "sem" = sem filho definido */
+  const [filtro, setFiltro] = useState<string | null>(null);
 
   useEffect(() => {
     const carregar = () =>
-      listarAtuais()
-        .then(setItens)
+      Promise.all([listarAtuais(), listarFilhosComRetirados()])
+        .then(([ds, fs]) => {
+          setItens(ds);
+          setFilhos(fs);
+        })
         .catch(() => setErro("Não consegui abrir o cofre neste navegador. Tente fora do modo anônimo."));
     carregar();
     // quando a sincronização traz registros de outro aparelho, recarrega
@@ -35,9 +43,14 @@ export default function ListaDespesas() {
     return () => clearTimeout(t);
   }, [mostrarAviso]);
 
+  const filhosAtivos = useMemo(() => filhos.filter((f) => !f.retirada), [filhos]);
+  const nomes = useMemo(() => new Map(filhos.map((f) => [f.linhagem, f.nome])), [filhos]);
+  const variosFilhos = filhosAtivos.length > 1;
+  const passaFiltro = (d: DespesaAtual) => filtro === null || (filtro === "sem" ? !d.filho : d.filho === filtro);
+
   // Ativas contam; retiradas ficam visíveis à parte, nunca somem.
-  const ativas = useMemo(() => (itens ?? []).filter((d) => !d.retirada), [itens]);
-  const retiradas = useMemo(() => (itens ?? []).filter((d) => d.retirada), [itens]);
+  const ativas = useMemo(() => (itens ?? []).filter((d) => !d.retirada && passaFiltro(d)), [itens, filtro]); // eslint-disable-line react-hooks/exhaustive-deps
+  const retiradas = useMemo(() => (itens ?? []).filter((d) => d.retirada && passaFiltro(d)), [itens, filtro]); // eslint-disable-line react-hooks/exhaustive-deps
   const [mostrarRetiradas, setMostrarRetiradas] = useState(false);
 
   const porMes = useMemo(() => {
@@ -76,13 +89,48 @@ export default function ListaDespesas() {
             <p className="mx-auto mt-2 max-w-xs text-sm text-ink-2">
               Cada despesa do seu filho, com o comprovante, guardada no dia em que acontece. Quando alguém pedir, está tudo aqui.
             </p>
+            {filhosAtivos.length === 0 && (
+              <Link href="/filhos/novo" className="mt-5 inline-block text-sm font-medium text-accent">
+                Comece cadastrando seu filho (só o nome basta)
+              </Link>
+            )}
           </div>
         )}
 
         {itens && itens.length > 0 && (
           <>
+            {variosFilhos ? (
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <Chip ativo={filtro === null} onClick={() => setFiltro(null)}>
+                  Todos
+                </Chip>
+                {filhosAtivos.map((f) => (
+                  <Chip key={f.linhagem} ativo={filtro === f.linhagem} onClick={() => setFiltro(f.linhagem)}>
+                    {f.nome}
+                  </Chip>
+                ))}
+                {(itens ?? []).some((d) => !d.filho) && (
+                  <Chip ativo={filtro === "sem"} onClick={() => setFiltro("sem")}>
+                    sem filho definido
+                  </Chip>
+                )}
+                <Link href="/filhos" className="ml-auto text-xs font-medium text-accent">
+                  filhos ›
+                </Link>
+              </div>
+            ) : (
+              <div className="mb-3 flex items-center justify-between text-xs">
+                <span className="text-ink-3">
+                  {filhosAtivos.length === 1 ? `${filhosAtivos[0].nome}${idade(filhosAtivos[0].nascimento) ? ` · ${idade(filhosAtivos[0].nascimento)}` : ""}` : "Nenhum filho cadastrado"}
+                </span>
+                <Link href={filhosAtivos.length ? "/filhos" : "/filhos/novo"} className="font-medium text-accent">
+                  {filhosAtivos.length ? "filhos ›" : "＋ cadastrar filho"}
+                </Link>
+              </div>
+            )}
+
             <div className="mb-5 grid grid-cols-2 gap-2">
-              <Tile rotulo="Total registrado" valor={formatBRL(totalGeral)} />
+              <Tile rotulo={filtro && filtro !== "sem" ? `Total · ${nomes.get(filtro) ?? ""}` : "Total registrado"} valor={formatBRL(totalGeral)} />
               <Tile rotulo="Com comprovante" valor={`${comComprovante} de ${ativas.length}`} />
             </div>
 
@@ -102,7 +150,7 @@ export default function ListaDespesas() {
                   </div>
                   <ul className="divide-y divide-rule overflow-hidden rounded-2xl border border-rule bg-surface">
                     {lista.map((d) => (
-                      <ItemDespesa key={d.id} d={d} />
+                      <ItemDespesa key={d.id} d={d} nomeFilho={variosFilhos && filtro === null ? (d.filho ? nomes.get(d.filho) ?? "?" : "todos") : undefined} />
                     ))}
                   </ul>
                 </section>
@@ -128,7 +176,7 @@ export default function ListaDespesas() {
                   <>
                     <ul className="divide-y divide-rule overflow-hidden rounded-2xl border border-rule bg-surface opacity-70">
                       {retiradas.map((d) => (
-                        <ItemDespesa key={d.id} d={d} />
+                        <ItemDespesa key={d.id} d={d} nomeFilho={variosFilhos && filtro === null ? (d.filho ? nomes.get(d.filho) ?? "?" : "todos") : undefined} />
                       ))}
                     </ul>
                     <p className="mt-2 text-[11px] text-ink-3">
@@ -168,7 +216,20 @@ function Tile({ rotulo, valor }: { rotulo: string; valor: string }) {
   );
 }
 
-function ItemDespesa({ d }: { d: DespesaAtual }) {
+function Chip({ ativo, onClick, children }: { ativo: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={ativo}
+      className={["h-8 rounded-full border px-3 text-xs font-semibold", ativo ? "border-accent bg-accent text-white" : "border-rule bg-surface text-ink-2"].join(" ")}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ItemDespesa({ d, nomeFilho }: { d: DespesaAtual; nomeFilho?: string }) {
   const cat = infoCategoria(d.categoria);
   const [thumb, setThumb] = useState<string | null>(null);
 
@@ -204,6 +265,7 @@ function ItemDespesa({ d }: { d: DespesaAtual }) {
           <div className="flex items-center gap-2">
             <span className={["h-2 w-2 shrink-0 rounded-full", cat.dot].join(" ")} aria-hidden="true" />
             <span className="truncate text-sm font-medium">{cat.nome}</span>
+            {nomeFilho && <span className="shrink-0 rounded bg-rule/70 px-1 text-[10px] font-semibold text-ink-2">{nomeFilho}</span>}
             {d.rateio && (
               <span className="shrink-0 rounded bg-accent-soft px-1 text-[10px] font-semibold text-accent" title="parte do filho">
                 {formatPercentual(d.rateio.percentual)}

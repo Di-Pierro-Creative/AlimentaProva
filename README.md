@@ -15,6 +15,8 @@ Código: github.com/Di-Pierro-Creative/AlimentaProva · Publicado em https://cof
 
 ## O que faz
 
+**Filhos** — perfil por filho (nome, nascimento → idade, tamanhos, escola). Cada despesa diz de quem é; lista, planilha e relatório saem por filho. Uma pensão cobre todos os filhos (irmãos do mesmo pai).
+
 **Despesas** — foto/print do comprovante → leitura automática (valor, data, categoria sugerida) → conferir → guardar. Print de fatura de cartão vira vários registros, um por lançamento, com o mesmo comprovante. Rateio: quando só uma parte é do filho (restaurante, mercado), grava o total, o percentual e o critério.
 
 **Pensão** — cada pagamento recebido (print do Pix/extrato, valor, data, mês a que se refere, forma). Valor combinado/fixado — em reais ou em % do salário mínimo — com dia de vencimento e vigência; cada mês mostra combinado × recebido. Gráfico custo do filho × pensão recebida. **Atrasados atualizados** com memória de cálculo (INPC/IPCA + juros, à escolha; recorte das 3 últimas prestações do art. 528, § 7º).
@@ -47,17 +49,20 @@ app/                      rotas (App Router)
   nova/                   registrar despesa     → components/CapturaDespesa
   despesa/[id]            detalhe da despesa    → components/DetalheDespesa
   exportar/, relatorio/   exportação            → components/Exportar, Relatorio
+  filhos/, filhos/novo, filhos/[id]   perfis dos filhos → components/Filhos, FilhoTela
   conta/                  conta                 → components/Conta
   api/ler-comprovante     leitura automática (servidor)
   api/indices             INPC e IPCA do IBGE, com cache (servidor)
 components/
   CabecalhoCofre          cabeçalho com as abas e o estado da conta
   GraficoCustoPensao      gráfico custo × pensão (SVG, sem biblioteca)
+  SeletorFilho            chips "de quem é" (usado na captura e na edição)
   RateioPainel, Sincronizador
 lib/
   types.ts                modelo de dados — a "etiqueta" de cada registro
   store.ts                despesas: armazenamento append-only (IndexedDB)
   pagamentos.ts           pagamentos e valor combinado (IndexedDB)
+  filhos.ts               perfis dos filhos (IndexedDB) + idade, nomes
   pensao.ts               contas mês a mês: devido × recebido, série custo × pensão
   atrasados.ts            memória de cálculo dos atrasados (correção + juros)
   indices.ts, indices-cache.ts, salario-minimo.ts   INPC/IPCA embutidos + busca no IBGE; tabela do salário mínimo

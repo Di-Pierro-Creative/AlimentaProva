@@ -23,6 +23,8 @@ export function definirBuscadorRemoto(fn: (blobKey: string) => Promise<Blob | un
 }
 
 export interface NovaDespesaInput {
+  /** de qual filho (linhagem do Filho); ausente = de todos / não especificado */
+  filho?: string;
   /** parte do filho (se houver rateio, já calculada) */
   valor_centavos: number;
   rateio?: Rateio;
@@ -62,6 +64,7 @@ export async function criarDespesa(input: NovaDespesaInput): Promise<Despesa> {
     versao: 1,
     versao_de: null,
     criado_em: new Date().toISOString(),
+    filho: input.filho || undefined,
     data_do_fato: input.data_do_fato,
     valor_centavos: input.valor_centavos,
     rateio: input.rateio,
@@ -96,6 +99,7 @@ export async function criarDespesasEmLote(
       versao: 1,
       versao_de: null,
       criado_em: new Date().toISOString(),
+      filho: item.filho || undefined,
       data_do_fato: item.data_do_fato,
       valor_centavos: item.valor_centavos,
       rateio: item.rateio,
@@ -113,9 +117,11 @@ export async function criarDespesasEmLote(
   return criadas;
 }
 
-export interface EdicaoInput extends Partial<Omit<NovaDespesaInput, "leitura" | "rateio">> {
+export interface EdicaoInput extends Partial<Omit<NovaDespesaInput, "leitura" | "rateio" | "filho">> {
   /** novo rateio; `null` remove o rateio; undefined mantém o anterior */
   rateio?: Rateio | null;
+  /** novo filho; `null` = passa a ser "de todos"; undefined mantém */
+  filho?: string | null;
   /** por que está alterando (opcional na edição, obrigatório na retirada) */
   motivo?: string;
 }
@@ -151,6 +157,7 @@ export async function novaVersao(anterior: Despesa, input: EdicaoInput): Promise
     versao: anterior.versao + 1,
     versao_de: anterior.id,
     criado_em: new Date().toISOString(),
+    filho: input.filho === undefined ? anterior.filho : input.filho || undefined,
     data_do_fato,
     valor_centavos,
     rateio,

@@ -7,7 +7,7 @@
 -- o valor probatório do histórico.
 --
 -- Uma tabela só para todos os tipos de registro (despesa, pagamento de pensão,
--- valor combinado): as colunas comuns ficam em colunas; o resto vai em `dados`
+-- valor combinado, perfil de filho): as colunas comuns ficam em colunas; o resto vai em `dados`
 -- (JSON). Consultar um campo do JSON: dados->>'valor_centavos'.
 --
 -- LGPD: a exclusão da CONTA inteira (direito de eliminação) é operação
@@ -16,7 +16,7 @@
 create table if not exists public.registros (
   id           text primary key,
   dono         uuid not null default auth.uid() references auth.users (id) on delete cascade,
-  tipo         text not null check (tipo in ('despesa', 'pagamento', 'combinado')),
+  tipo         text not null check (tipo in ('despesa', 'pagamento', 'combinado', 'filho')),
   linhagem     text not null,
   versao       integer not null,
   versao_de    text,
@@ -59,3 +59,8 @@ create policy "dono le comprovante"
 
 -- (sem policy de UPDATE e sem policy de DELETE no storage — o arquivo é imutável;
 --  a chave é o próprio SHA-256, então o mesmo arquivo nunca sobe duas vezes)
+
+-- Se você rodou uma versão anterior deste arquivo (sem o tipo 'filho'), rode
+-- também as duas linhas abaixo — elas trocam a regra de tipos permitidos:
+alter table public.registros drop constraint if exists registros_tipo_check;
+alter table public.registros add constraint registros_tipo_check check (tipo in ('despesa', 'pagamento', 'combinado', 'filho'));

@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { listarLog } from "@/lib/store";
 import { listarLogCombinado, listarLogPagamentos, nomeForma } from "@/lib/pagamentos";
+import { listarLogFilhos, listarNomes, nomeDoFilho } from "@/lib/filhos";
 import { CATEGORIAS, categoria as infoCategoria } from "@/lib/categorias";
 import { formatBRL, formatData, formatDataHora, formatDataLonga, nomeMes } from "@/lib/format";
 import { descreverRateio } from "@/lib/rateio";
@@ -31,8 +32,8 @@ export default function Relatorio() {
   const [indices, setIndices] = useState<Indices>(INDICES_EMBUTIDOS);
 
   useEffect(() => {
-    Promise.all([listarLog(), listarLogPagamentos(), listarLogCombinado()])
-      .then(([log, logPag, logComb]) => setPrep(preparar(log, logPag, logComb)))
+    Promise.all([listarLog(), listarLogPagamentos(), listarLogCombinado(), listarLogFilhos()])
+      .then(([log, logPag, logComb, logFilhos]) => setPrep(preparar(log, logPag, logComb, logFilhos)))
       .catch(() => setErro("Não consegui abrir o cofre neste navegador."));
     obterIndices().then(setIndices);
   }, []);
@@ -105,7 +106,10 @@ export default function Relatorio() {
           <>
             <header className="border-b-2 border-ink pb-3">
               <p className="text-[11px] font-semibold uppercase tracking-widest text-ink-3">AlimentaProva · demonstrativo de despesas{temPensao ? " e pensão" : ""}</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight">Despesas do filho{temPensao ? " e pensão recebida" : ""} — {tituloPeriodo}</h1>
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+                Despesas {prep.filhos.length ? `de ${listarNomes(prep.filhos.map((f) => f.nome))}` : "do filho"}
+                {temPensao ? " e pensão recebida" : ""} — {tituloPeriodo}
+              </h1>
               <p className="mt-1 text-xs text-ink-2">
                 Gerado em {formatDataHora(geradoEm)} · {ativas.length} {ativas.length === 1 ? "despesa" : "despesas"} · {comComprovante} com comprovante
                 {retiradas.length > 0 ? ` · ${retiradas.length} ${retiradas.length === 1 ? "retirada" : "retiradas"} (não constam)` : ""}
@@ -158,6 +162,31 @@ export default function Relatorio() {
                 )}
 
                 {ativas.length > 0 && (<>
+                {prep.filhos.length > 1 && (
+                  <section className="mt-5 break-inside-avoid">
+                    <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-ink-3">Resumo por filho</h2>
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="border-b border-rule text-left text-[11px] uppercase tracking-wide text-ink-3">
+                          <th className="py-1.5 pr-2 font-semibold">Filho</th>
+                          <th className="py-1.5 pr-2 text-right font-semibold">Despesas</th>
+                          <th className="py-1.5 text-right font-semibold">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...prep.filhos.map((f) => ({ nome: f.nome, ds: ativas.filter((d) => d.filho === f.linhagem) })), { nome: "De todos / da casa", ds: ativas.filter((d) => !d.filho) }]
+                          .filter((l) => l.ds.length > 0)
+                          .map((l) => (
+                            <tr key={l.nome} className="border-b border-rule/70">
+                              <td className="py-1.5 pr-2">{l.nome}</td>
+                              <td className="tnum py-1.5 pr-2 text-right">{l.ds.length}</td>
+                              <td className="tnum py-1.5 text-right">{formatBRL(l.ds.reduce((s, d) => s + d.valor_centavos, 0))}</td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </section>
+                )}
                 {/* Resumo por categoria */}
                 <section className="mt-5 break-inside-avoid">
                   <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-ink-3">Resumo por categoria</h2>
@@ -201,6 +230,7 @@ export default function Relatorio() {
                       <thead>
                         <tr className="border-b border-rule text-left text-[11px] uppercase tracking-wide text-ink-3">
                           <th className="py-1.5 pr-2 font-semibold">Data</th>
+                          {prep.filhos.length > 1 && <th className="py-1.5 pr-2 font-semibold">Filho</th>}
                           <th className="py-1.5 pr-2 font-semibold">Categoria</th>
                           <th className="py-1.5 pr-2 font-semibold">Descrição</th>
                           <th className="py-1.5 pr-2 text-right font-semibold">Valor</th>
@@ -213,7 +243,7 @@ export default function Relatorio() {
                         return (
                           <tbody key={mes} className="break-inside-avoid">
                             <tr className="bg-paper print:bg-transparent">
-                              <td colSpan={3} className="py-1.5 pr-2 text-xs font-semibold">
+                              <td colSpan={prep.filhos.length > 1 ? 4 : 3} className="py-1.5 pr-2 text-xs font-semibold">
                                 {nomeMes(mes)}
                               </td>
                               <td className="tnum py-1.5 pr-2 text-right text-xs font-semibold">{formatBRL(t)}</td>
@@ -222,6 +252,7 @@ export default function Relatorio() {
                             {lista.map((d) => (
                               <tr key={d.id} className="border-b border-rule/70 align-top">
                                 <td className="tnum whitespace-nowrap py-1.5 pr-2">{formatDataLonga(d.data_do_fato).replace(/ de \d{4}$/, "")}</td>
+                                {prep.filhos.length > 1 && <td className="py-1.5 pr-2">{nomeDoFilho(d.filho, prep.nomesFilhos, "todos")}</td>}
                                 <td className="py-1.5 pr-2">{infoCategoria(d.categoria).nome}</td>
                                 <td className="py-1.5 pr-2">
                                   {d.observacao || <span className="text-ink-3">—</span>}

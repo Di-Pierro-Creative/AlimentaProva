@@ -11,6 +11,9 @@ import { reduzirParaLeitura } from "@/lib/imagem";
 import { formatBRL, formatBytes, formatData, hojeISO, parseBRL } from "@/lib/format";
 import { PERCENTUAIS_RAPIDOS, formatPercentual, parteDoFilho } from "@/lib/rateio";
 import RateioPainel from "./RateioPainel";
+import SeletorFilho from "./SeletorFilho";
+import { listarFilhos } from "@/lib/filhos";
+import type { FilhoAtual } from "@/lib/types";
 
 type Estado = "editando" | "salvando" | "erro";
 type LeituraEstado = "ocioso" | "lendo" | "ok" | "nao_comprovante" | "falhou" | "indisponivel";
@@ -90,6 +93,19 @@ export default function CapturaDespesa() {
   const cameraRef = useRef<HTMLInputElement>(null);
   const galeriaRef = useRef<HTMLInputElement>(null);
 
+  // filhos: 1 → atribui sozinho; 2+ → a pessoa escolhe (ou "todos"); 0 → sem filho
+  const [filhos, setFilhos] = useState<FilhoAtual[]>([]);
+  const [filho, setFilho] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    listarFilhos()
+      .then((fs) => {
+        setFilhos(fs);
+        setFilho(fs.length === 1 ? fs[0].linhagem : fs.length === 0 ? null : undefined);
+      })
+      .catch(() => setFilho(null));
+  }, []);
+  const filhoOk = filhos.length < 2 || filho !== undefined;
+
   const valorCentavos = useMemo(() => parseBRL(valorTexto), [valorTexto]);
   /** o que vai para o cofre no modo único: parte do filho (ou o valor inteiro) */
   const parteUnico = useMemo(
@@ -101,6 +117,7 @@ export default function CapturaDespesa() {
 
   const podeSalvar =
     estado !== "salvando" &&
+    filhoOk &&
     (modo === "lista" ? marcados.length > 0 : parteUnico !== null && parteUnico > 0 && categoria !== null);
 
   const itemUnico = leitura?.tipo === "unico" ? leitura.itens[0] : undefined;
@@ -270,6 +287,7 @@ export default function CapturaDespesa() {
       if (modo === "lista") {
         await criarDespesasEmLote(
           marcados.map((i) => ({
+            filho: filho ?? undefined,
             valor_centavos: parteItem(i),
             rateio: i.percentual < 100 ? { total_centavos: i.valor_centavos, percentual: i.percentual } : undefined,
             data_do_fato: i.data,
@@ -284,6 +302,7 @@ export default function CapturaDespesa() {
       }
       if (valorCentavos === null || parteUnico === null || categoria === null) return;
       await criarDespesa({
+        filho: filho ?? undefined,
         valor_centavos: parteUnico,
         rateio: rateioAtivo
           ? { total_centavos: valorCentavos, percentual: rateioPct, criterio: rateioCriterio.trim() || undefined }
@@ -385,6 +404,8 @@ export default function CapturaDespesa() {
             </p>
           )}
         </section>
+
+        {filhos.length >= 2 && <SeletorFilho filhos={filhos} valor={filho} onChange={setFilho} rotulo={modo === "lista" ? "De quem são estes lançamentos?" : "De quem é?"} />}
 
         {modo === "lista" ? (
           /* ===== MODO LISTA: um registro por lançamento marcado ===== */
@@ -660,7 +681,9 @@ export default function CapturaDespesa() {
           disabled={!podeSalvar}
           className="h-14 w-full rounded-2xl bg-accent text-base font-semibold text-white shadow-sm transition-colors disabled:bg-rule disabled:text-ink-3 active:bg-accent-strong"
         >
-          {estado === "salvando"
+          {!filhoOk && estado !== "salvando"
+            ? "Escolha de quem é a despesa"
+            : estado === "salvando"
             ? "Guardando…"
             : modo === "lista"
               ? marcados.length === 0
