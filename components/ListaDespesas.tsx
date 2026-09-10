@@ -8,7 +8,7 @@ import { listarAtuais, obterBlob } from "@/lib/store";
 import type { DespesaAtual } from "@/lib/types";
 import { chaveMes, formatBRL, formatData, nomeMes } from "@/lib/format";
 import { formatPercentual } from "@/lib/rateio";
-import { idade, listarFilhosComRetirados } from "@/lib/filhos";
+import { listarFilhosComRetirados } from "@/lib/filhos";
 import type { FilhoAtual } from "@/lib/types";
 import CabecalhoCofre from "./CabecalhoCofre";
 
@@ -114,7 +114,7 @@ export default function ListaDespesas() {
               className="mb-3 flex items-center justify-between rounded-xl border border-rule bg-surface px-3 py-2 text-xs active:bg-rule/40"
             >
               <span className={filhosAtivos.length === 1 ? "font-semibold text-ink" : "text-ink-3"}>
-                {filhosAtivos.length === 1 ? `${filhosAtivos[0].nome}${idade(filhosAtivos[0].nascimento) ? ` · ${idade(filhosAtivos[0].nascimento)}` : ""}` : "Nenhum filho cadastrado"}
+                {filhosAtivos.length === 1 ? filhosAtivos[0].nome : "Nenhum filho cadastrado"}
               </span>
               <span className="font-medium text-accent">{filhosAtivos.length === 1 ? "ver perfil ›" : "＋ cadastrar filho"}</span>
             </Link>
@@ -127,7 +127,7 @@ export default function ListaDespesas() {
             </div>
             <h2 className="text-lg font-semibold">Seu cofre está vazio</h2>
             <p className="mx-auto mt-2 max-w-xs text-sm text-ink-2">
-              Tire uma foto do comprovante ou faça uma captura de tela — seja de hoje ou de meses atrás. O app lê o valor e a data, categoriza e organiza tudo. Quando o advogado pedir, está tudo aqui.
+              Tire uma foto do comprovante ou faça uma captura de tela — seja de hoje ou de meses atrás. O app lê o valor e a data, categoriza e organiza tudo. Quando o advogado pedir, é só exportar.
             </p>
           </div>
         )}

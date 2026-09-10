@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { idade, listarFilhosComRetirados } from "@/lib/filhos";
+import { listarFilhosComRetirados } from "@/lib/filhos";
 import type { FilhoAtual } from "@/lib/types";
 
 export default function Filhos() {
@@ -88,8 +88,7 @@ export default function Filhos() {
 }
 
 function ItemFilho({ f }: { f: FilhoAtual }) {
-  const anos = idade(f.nascimento);
-  const detalhes = [anos, f.roupa ? `roupa ${f.roupa}` : "", f.calcado ? `calçado ${f.calcado}` : "", f.escola].filter(Boolean).join(" · ");
+  const detalhes = [f.roupa ? `roupa ${f.roupa}` : "", f.calcado ? `calçado ${f.calcado}` : "", f.escola].filter(Boolean).join(" · ");
   return (
     <li>
       <Link href={`/filhos/${f.linhagem}`} className="flex items-center gap-3 px-4 py-3 active:bg-rule/40">

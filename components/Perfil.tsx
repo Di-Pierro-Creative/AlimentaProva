@@ -1,12 +1,13 @@
 "use client";
 
-// Perfil da genitora: os filhos (com o perfil de cada um a um toque), a conta
+// Perfil da genitora: os filhos (com o perfil de cada um a um toque; a idade
+// fica só dentro do perfil, por pedido dela), a conta
 // na nuvem, privacidade e apagar. É a porta de entrada para tudo que não é
 // registrar despesa ou pensão. Aberto pelo botão "Perfil" do cabeçalho.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { idade, listarFilhosComRetirados } from "@/lib/filhos";
+import { listarFilhosComRetirados } from "@/lib/filhos";
 import { aoMudarSessao, type Sessao } from "@/lib/conta";
 import { contaConfigurada } from "@/lib/supabase";
 import { observarSync, type EstadoSync } from "@/lib/sync";
@@ -67,7 +68,7 @@ export default function Perfil() {
               )}
               <ul className="divide-y divide-rule">
                 {ativos.map((f) => {
-                  const detalhes = [idade(f.nascimento), f.roupa ? `roupa ${f.roupa}` : "", f.calcado ? `calçado ${f.calcado}` : "", f.escola]
+                  const detalhes = [f.roupa ? `roupa ${f.roupa}` : "", f.calcado ? `calçado ${f.calcado}` : "", f.escola]
                     .filter(Boolean)
                     .join(" · ");
                   return (
